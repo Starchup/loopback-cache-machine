@@ -1,7 +1,3 @@
-/* Module Dependencies */
-var pluralize = require('pluralize');
-
-/* Constructor */
 module.exports = function (app)
 {
     var self = this;

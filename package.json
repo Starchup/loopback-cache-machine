@@ -3,8 +3,10 @@
     "version": "0.0.1",
     "description": "Caching system for Loopback, maintained over webhook",
     "main": "cache.js",
-    "scripts": {},
-    "repository": {
+    "scripts":
+    {},
+    "repository":
+    {
         "type": "git",
         "url": "git+https://github.com/Starchup/loopback-cache-machine.git"
     },
@@ -12,8 +14,5 @@
         "starchup"
     ],
     "author": "Starchup Inc",
-    "homepage": "https://github.com/Starchup/loopback-cache-machine#readme",
-    "dependencies": {
-        "pluralize": "5.0.0"
-    }
+    "homepage": "https://github.com/Starchup/loopback-cache-machine#readme"
 }
