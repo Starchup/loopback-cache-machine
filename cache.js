@@ -16,7 +16,12 @@ module.exports = function (app)
         else
         {
             var localData = self[req.body.modelName];
+
+            // If there is not even an empty dictionary for this modelName
+            // if means this cache is not listening for the model, so only
+            // add the data if we actually care about it
             if (localData) localData[req.body.data.id] = req.body.data;
+
             res.status(200).send();
         }
     });
