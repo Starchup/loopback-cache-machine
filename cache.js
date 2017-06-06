@@ -4,26 +4,15 @@ module.exports = function (app)
 
     if (app) app.post('/cache/receive', function (req, res)
     {
-        if (!req.body)
-        {
-            res.status(400).send('body is required');
-        }
-        else if (!req.body.modelName)
-        {
-            res.status(400).send('modelName is required');
-        }
-        else if (!req.body.methodName)
-        {
-            res.status(400).send('methodName is required');
-        }
-        else if (!req.body.data)
-        {
-            res.status(400).send('data is required');
-        }
-        else if (!req.body.data.id)
-        {
-            res.status(400).send('model id is required in data');
-        }
+        var errorMsg;
+
+        if (!req.body) errorMsg = 'body is required';
+        else if (!req.body.modelName) errorMsg = 'modelName is required';
+        else if (!req.body.methodName) errorMsg = 'methodName is required';
+        else if (!req.body.data) errorMsg = 'data is required';
+        else if (!req.body.data.id) errorMsg = 'model id is required in data';
+
+        if (errorMsg) res.status(400).send(errorMsg);
         else
         {
             var localData = self[req.body.modelName];
