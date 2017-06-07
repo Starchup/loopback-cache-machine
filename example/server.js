@@ -5,9 +5,6 @@ var app = module.exports = loopback();
 
 app.use(bodyParser.json());
 
-var cache = new require('../cache.js')(app);
-cache.watchModel('Customer');
-
 app.start = function ()
 {
     app.listen(function ()

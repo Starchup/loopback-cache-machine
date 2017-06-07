@@ -1,9 +1,9 @@
 # loopback-cache-machine
 Caching system for Loopback, maintained over webhook
 
-### USage
+### Usage client side
 
-In server.js (preferrably, or else in a boot script)
+In a boot script
 ```
 // Instanciate with the app
 var cache = new require('../cache.js')(app);
@@ -20,3 +20,7 @@ var cache = new require('loopback-cache-machine')();
 // And boom you have access to cached data
 var customer = cache.Customer[_customer_id_];
 ```
+
+
+### Usage server side
+

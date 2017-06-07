@@ -1,4 +1,4 @@
-var app = require('../example.js');
+var app = require('../server.js');
 var expect = require('chai').expect;
 var rp = require('request-promise');
 
