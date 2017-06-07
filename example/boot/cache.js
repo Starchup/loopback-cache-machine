@@ -1,10 +1,10 @@
 module.exports = function startCache(app)
 {
+    // Server
     var rp = require('request-promise');
     var cacheServer = new require('../../cache.js')(app,
     {
         type: 'server',
-        modelNames: ['Customer'],
         receivers: [app.get('url') + 'cache/receive'],
         send: function (uri, data)
         {
@@ -17,8 +17,9 @@ module.exports = function startCache(app)
             });
         }
     });
+    cacheServer.broadcastModels('Customer');
 
-
+    // Client
     var cacheClient = new require('../../cache.js')(app,
     {
         type: 'client'

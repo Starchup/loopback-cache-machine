@@ -14,6 +14,12 @@ module.exports = function (app, options)
         if (!self[modelName]) self[modelName] = {};
     }
 
+    self.broadcastModels = function (modelName)
+    {
+        app.models[modelName].observe('after save', self.hook);
+        app.models[modelName].observe('before delete', self.deleteHook);
+    }
+
     return self;
 }
 
@@ -60,18 +66,14 @@ function clientSide(cache, app, options)
  */
 function serverSide(cache, app, options)
 {
-    if (!options.modelNames) throw new Error('modelNames are required for cache server');
     if (!options.receivers) throw new Error('receivers are required for cache server');
     if (!options.send) throw new Error('send function is required for cache server');
 
-    options.modelNames.forEach(function (modelName)
-    {
-        app.models[modelName].observe('after save', hook);
-        app.models[modelName].observe('before delete', deleteHook);
-    });
+    cache.receivers = options.receivers;
+    cache.send = options.send;
 
     //Formats data and calls Master Hooker
-    function hook(ctx, next)
+    cache.hook = function (ctx, next)
     {
         // Clone the instance or fallback to the data
         var instance = null;
@@ -98,7 +100,7 @@ function serverSide(cache, app, options)
                 {
                     modelId.inq.forEach(function (id)
                     {
-                        if (typeof id === 'number') return send(
+                        if (typeof id === 'number') return cache.emit(
                         {
                             modelName: modelName,
                             methodName: method,
@@ -108,7 +110,7 @@ function serverSide(cache, app, options)
                     });
                 }
             }
-            else return send(
+            else return cache.emit(
             {
                 modelName: modelName,
                 methodName: method,
@@ -123,7 +125,7 @@ function serverSide(cache, app, options)
     }
 
     //Formats data and calls Master Hooker
-    function deleteHook(ctx, next)
+    cache.deleteHook = function (ctx, next)
     {
         var modelName = getModelName(ctx);
         if (!modelName) return next();
@@ -141,7 +143,7 @@ function serverSide(cache, app, options)
             {
                 return prev.then(function ()
                 {
-                    return send(
+                    return cache.emit(
                     {
                         modelName: modelName,
                         methodName: 'delete',
@@ -152,13 +154,13 @@ function serverSide(cache, app, options)
         }).catch(console.error).finally(next);
     }
 
-    function send(data)
+    cache.emit = function (data)
     {
-        return options.receivers.reduce(function (prev, curr, idx)
+        return cache.receivers.reduce(function (prev, curr, idx)
         {
             return prev.then(function ()
             {
-                return options.send(curr, data).catch(console.error);
+                return cache.send(curr, data).catch(console.error);
             });
         }, Promise.resolve());
     }

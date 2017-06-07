@@ -6,7 +6,7 @@ Caching system for Loopback, maintained over webhook
 In a boot script
 ```
 // Instanciate with the app
-var cache = new require('../cache.js')(app);
+var cache = new require('loopback-cache-machine')(app, {type: 'client'});
 
 // And tell it what model name to listen to
 cache.watchModel('Customer');
@@ -24,3 +24,26 @@ var customer = cache.Customer[_customer_id_];
 
 ### Usage server side
 
+In a boot script
+```
+// Prepare the network request handler (needs to be passed,
+// to avoid unnecessary dependencies on cache machine)
+var rp = require('request-promise');
+// Instanciate with the app
+var cacheServer = new require('loopback-cache-machine')(app,
+{
+    type: 'server',
+    receivers: [app.get('url') + 'cache/receive'],
+    send: function (uri, data)
+    {
+        return rp(
+        {
+            method: 'POST',
+            uri: uri,
+            body: data,
+            json: true
+        });
+    }
+});
+cacheServer.broadcastModels('Customer');
+```
