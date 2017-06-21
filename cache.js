@@ -151,7 +151,7 @@ function serverSide(cache, app, options)
                     }).catch(console.error);
                 });
             }, Promise.resolve());
-        }).catch(console.error).finally(next);
+        }).catch(console.error).then(next);
     }
 
     cache.emit = function (data)
