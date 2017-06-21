@@ -147,7 +147,7 @@ function serverSide(cache, app, options)
                     {
                         modelName: modelName,
                         methodName: 'delete',
-                        modelId: m.id
+                        modelId: curr.id
                     }).catch(console.error);
                 });
             }, Promise.resolve());
