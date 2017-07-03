@@ -9,6 +9,17 @@ module.exports = function (app, options)
         throw new Error('Type "' + options.type + '"" is not valid. Use "server" or "client"');
     }
 
+    self.findObj = function (modelName, key, value)
+    {
+        return Object.keys(self[modelName]).map(function (k)
+        {
+            return self[modelName][k];
+        }).find(function (obj)
+        {
+            return obj[key] === value;
+        });
+    }
+
     self.watchModel = function (modelName)
     {
         if (!self[modelName]) self[modelName] = {};
