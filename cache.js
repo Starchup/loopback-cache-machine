@@ -22,7 +22,20 @@ module.exports = function (app, options)
 
     self.watchModel = function (modelName)
     {
-        if (!self[modelName]) self[modelName] = {};
+        if (self[modelName]) return;
+
+        self[modelName] = {};
+
+        return self.broadcasters.reduce(function (prev, curr, idx)
+        {
+            return prev.then(function ()
+            {
+                return self.ask(curr,
+                {
+                    model: modelName
+                }).catch(console.error);
+            });
+        }, Promise.resolve());
     }
 
     self.broadcastModels = function (modelName)
@@ -40,7 +53,14 @@ module.exports = function (app, options)
  */
 function clientSide(cache, app, options)
 {
-    if (app) app.post('/cache/receive', function (req, res)
+    if (!app) throw new Error('app is required for cache client');
+    if (!options.broadcasters) throw new Error('broadcasters are required for cache client');
+    if (!options.ask) throw new Error('ask function is required for cache client');
+
+    cache.broadcasters = options.broadcasters;
+    cache.ask = options.ask;
+
+    app.post('/cache/receive', function (req, res)
     {
         var errorMsg;
 
@@ -77,11 +97,32 @@ function clientSide(cache, app, options)
  */
 function serverSide(cache, app, options)
 {
+    if (!app) throw new Error('app is required for cache server');
     if (!options.receivers) throw new Error('receivers are required for cache server');
     if (!options.send) throw new Error('send function is required for cache server');
 
     cache.receivers = options.receivers;
     cache.send = options.send;
+
+    app.post('/cache/broadcaster', function (req, res)
+    {
+        var errorMsg;
+
+        if (!req.body) errorMsg = 'body is required';
+        if (!req.body.model) errorMsg = 'model name is required';
+
+        if (errorMsg) res.status(400).send(errorMsg);
+        else
+        {
+            var Model = app.models[req.body.model];
+            if (!Model) return res.status(400).send('No model found with name ' + req.body.model);
+
+            Model.find().then(function (data)
+            {
+                res.status(200).send(data);
+            });
+        }
+    });
 
     //Formats data and calls Master Hooker
     cache.hook = function (ctx, next)

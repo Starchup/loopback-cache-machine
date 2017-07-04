@@ -22,7 +22,18 @@ module.exports = function startCache(app)
     // Client
     var cacheClient = new require('../../cache.js')(app,
     {
-        type: 'client'
+        type: 'client',
+        broadcasters: [app.get('url') + 'cache/broadcaster'],
+        ask: function (uri, data)
+        {
+            return rp(
+            {
+                method: 'POST',
+                uri: uri,
+                body: data,
+                json: true
+            });
+        }
     });
     cacheClient.watchModel('Customer');
 };
