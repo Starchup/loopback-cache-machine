@@ -64,7 +64,10 @@ function clientSide(cache, app, options)
     if (!options.broadcasters) throw new Error('broadcasters are required for cache client');
     if (!options.ask) throw new Error('ask function is required for cache client');
 
-    cache.broadcasters = options.broadcasters;
+    cache.broadcasters = options.broadcasters.map(function (r)
+    {
+        return r + '/cache/broadcaster';
+    });
     cache.ask = options.ask;
 
     app.post('/cache/receiver', function (req, res)
@@ -108,7 +111,10 @@ function serverSide(cache, app, options)
     if (!options.receivers) throw new Error('receivers are required for cache server');
     if (!options.send) throw new Error('send function is required for cache server');
 
-    cache.receivers = options.receivers;
+    cache.receivers = options.receivers.map(function (r)
+    {
+        return r + '/cache/receiver';
+    });
     cache.send = options.send;
 
     app.post('/cache/broadcaster', function (req, res)

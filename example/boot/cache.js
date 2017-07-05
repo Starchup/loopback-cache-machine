@@ -5,7 +5,7 @@ module.exports = function startCache(app)
     var cacheServer = new require('../../cache.js')(app,
     {
         type: 'server',
-        receivers: [app.get('url') + 'cache/receive'],
+        receivers: [app.get('url')],
         send: function (uri, data)
         {
             return rp(
@@ -23,7 +23,7 @@ module.exports = function startCache(app)
     var cacheClient = new require('../../cache.js')(app,
     {
         type: 'client',
-        broadcasters: [app.get('url') + 'cache/broadcaster'],
+        broadcasters: [app.get('url')],
         ask: function (uri, data)
         {
             return rp(
