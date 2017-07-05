@@ -6,7 +6,11 @@ Caching system for Loopback, maintained over webhook
 In a boot script
 ```
 // Instanciate with the app
-var cache = new require('loopback-cache-machine')(app, {type: 'client'});
+var cache = new require('loopback-cache-machine')(app,
+{
+    type: 'client',
+    broadcasters: [app.get('url') + 'cache/broadcaster']
+});
 
 // And tell it what model name to listen to
 cache.watchModel('Customer');
