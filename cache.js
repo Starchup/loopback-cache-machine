@@ -1,6 +1,10 @@
+var bodyParser = require('body-parser');
+
 module.exports = function (app, options)
 {
     var self = this;
+
+    if (app) app.use(bodyParser.json());
 
     if (options && options.type === 'client') clientSide(self, app, options);
     else if (options && options.type === 'server') serverSide(self, app, options);
@@ -33,6 +37,9 @@ module.exports = function (app, options)
                 return self.ask(curr,
                 {
                     model: modelName
+                }).then(function (res)
+                {
+                    self[modelName] = res;
                 }).catch(console.error);
             });
         }, Promise.resolve());
@@ -60,7 +67,7 @@ function clientSide(cache, app, options)
     cache.broadcasters = options.broadcasters;
     cache.ask = options.ask;
 
-    app.post('/cache/receive', function (req, res)
+    app.post('/cache/receiver', function (req, res)
     {
         var errorMsg;
 

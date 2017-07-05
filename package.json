@@ -1,6 +1,6 @@
 {
     "name": "loopback-cache-machine",
-    "version": "2.0.4",
+    "version": "2.0.5",
     "description": "Caching system for Loopback, maintained over webhook",
     "main": "cache.js",
     "scripts":
@@ -14,5 +14,9 @@
         "starchup"
     ],
     "author": "Starchup Inc",
-    "homepage": "https://github.com/Starchup/loopback-cache-machine#readme"
+    "homepage": "https://github.com/Starchup/loopback-cache-machine#readme",
+    "dependencies":
+    {
+        "body-parser": "1.17.2"
+    }
 }
