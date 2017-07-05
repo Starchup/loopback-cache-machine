@@ -69,7 +69,7 @@ function clientSide(cache, app, options)
 
     cache.broadcasters = options.broadcasters.map(function (r)
     {
-        return r + '/cache/broadcaster';
+        return r + 'cache/broadcaster';
     });
     cache.ask = options.ask;
 
@@ -116,7 +116,7 @@ function serverSide(cache, app, options)
 
     cache.receivers = options.receivers.map(function (r)
     {
-        return r + '/cache/receiver';
+        return r + 'cache/receiver';
     });
     cache.send = options.send;
 

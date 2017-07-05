@@ -13,7 +13,7 @@ describe('Test order hook', function ()
     {
         var options = {
             method: 'POST',
-            uri: app.get('url') + 'cache/receive',
+            uri: app.get('url') + 'cache/receiver',
             body:
             {
                 modelName: 'Customer',
