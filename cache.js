@@ -39,7 +39,10 @@ module.exports = function (app, options)
                     model: modelName
                 }).then(function (res)
                 {
-                    self[modelName] = res;
+                    res.forEach(function (obj)
+                    {
+                        self[modelName][obj.id] = obj;
+                    });
                 }).catch(console.error);
             });
         }, Promise.resolve());
