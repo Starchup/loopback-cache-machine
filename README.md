@@ -9,7 +9,17 @@ In a boot script
 var cache = new require('loopback-cache-machine')(app,
 {
     type: 'client',
-    broadcasters: [app.get('url') + 'cache/broadcaster']
+    broadcasters: [app.get('url')],
+    ask: function (uri, data)
+    {
+        return rp(
+        {
+            method: 'POST',
+            uri: uri,
+            body: data,
+            json: true
+        });
+    }
 });
 
 // And tell it what model name to listen to
@@ -37,7 +47,7 @@ var rp = require('request-promise');
 var cacheServer = new require('loopback-cache-machine')(app,
 {
     type: 'server',
-    receivers: [app.get('url') + 'cache/receive'],
+    receivers: [app.get('url')],
     send: function (uri, data)
     {
         return rp(
@@ -49,5 +59,4 @@ var cacheServer = new require('loopback-cache-machine')(app,
         });
     }
 });
-cacheServer.broadcastModels('Customer');
 ```

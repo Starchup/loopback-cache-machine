@@ -17,7 +17,6 @@ module.exports = function startCache(app)
             });
         }
     });
-    cacheServer.broadcastModels('Customer');
 
     // Client
     var cacheClient = new require('../../cache.js')(app,

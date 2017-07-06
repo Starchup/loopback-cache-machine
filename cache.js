@@ -48,12 +48,6 @@ module.exports = function (app, options)
         }, Promise.resolve());
     }
 
-    self.broadcastModels = function (modelName)
-    {
-        app.models[modelName].observe('after save', self.hook);
-        app.models[modelName].observe('before delete', self.deleteHook);
-    }
-
     return self;
 }
 
@@ -119,6 +113,7 @@ function serverSide(cache, app, options)
         return r + 'cache/receiver';
     });
     cache.send = options.send;
+    cache.modelsWatched = [];
 
     app.post('/cache/broadcaster', function (req, res)
     {
@@ -130,8 +125,18 @@ function serverSide(cache, app, options)
         if (errorMsg) res.status(400).send(errorMsg);
         else
         {
-            var Model = app.models[req.body.model];
-            if (!Model) return res.status(400).send('No model found with name ' + req.body.model);
+            var modelName = req.body.model;
+            var Model = app.models[modelName];
+
+            if (!Model) return res.status(400).send('No model found with name ' + modelName);
+
+            if (cache.modelsWatched.indexOf(modelName) < 0)
+            {
+                cache.modelsWatched.push(modelName);
+
+                Model.observe('after save', cache.hook);
+                Model.observe('before delete', cache.deleteHook);
+            }
 
             Model.find().then(function (data)
             {
