@@ -15,6 +15,8 @@ module.exports = function (app, options)
 
     self.findObj = function (modelName, key, value)
     {
+        console.info('findObj: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
+
         return Object.keys(self[modelName]).map(function (k)
         {
             return self[modelName][k];
@@ -26,6 +28,8 @@ module.exports = function (app, options)
 
     self.watchModel = function (modelName)
     {
+        console.info('Watching: ' + modelName);
+
         if (self[modelName]) return;
 
         self[modelName] = {};
@@ -34,11 +38,13 @@ module.exports = function (app, options)
         {
             return prev.then(function ()
             {
+                console.info('Asking ' + curr);
                 return self.ask(curr,
                 {
                     model: modelName
                 }).then(function (res)
                 {
+                    console.info('Received: ' + res.length);
                     res.forEach(function (obj)
                     {
                         self[modelName][obj.id] = obj;
