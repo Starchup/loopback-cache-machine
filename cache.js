@@ -13,9 +13,16 @@ module.exports = function (app, options)
         throw new Error('Type "' + options.type + '"" is not valid. Use "server" or "client"');
     }
 
+    var self.debug = options.debug || false;
+
+    var log = function (msg)
+    {
+        if (self.debug) console.info(msg);
+    }
+
     self.findObj = function (modelName, key, value)
     {
-        console.info('findObj: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
+        log('findObj: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
 
         return Object.keys(self[modelName]).map(function (k)
         {
@@ -28,7 +35,7 @@ module.exports = function (app, options)
 
     self.watchModel = function (modelName)
     {
-        console.info('Watching: ' + modelName);
+        log('Watching: ' + modelName);
 
         if (self[modelName]) return;
 
@@ -38,13 +45,13 @@ module.exports = function (app, options)
         {
             return prev.then(function ()
             {
-                console.info('Asking ' + curr);
+                log('Asking ' + curr);
                 return self.ask(curr,
                 {
                     model: modelName
                 }).then(function (res)
                 {
-                    console.info('Received: ' + res.length);
+                    log('Received: ' + res.length);
                     res.forEach(function (obj)
                     {
                         self[modelName][obj.id] = obj;
