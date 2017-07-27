@@ -13,7 +13,7 @@ module.exports = function (app, options)
         throw new Error('Type "' + options.type + '"" is not valid. Use "server" or "client"');
     }
 
-    var self.debug = options.debug || false;
+    var self.debug = options && options.debug || false;
 
     var log = function (msg)
     {
