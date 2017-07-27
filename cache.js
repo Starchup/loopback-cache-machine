@@ -33,6 +33,19 @@ module.exports = function (app, options)
         });
     }
 
+    self.findObjs = function (modelName, key, value)
+    {
+        log('findObjs: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
+
+        return Object.keys(self[modelName]).map(function (k)
+        {
+            return self[modelName][k];
+        }).filter(function (obj)
+        {
+            return obj[key] === value;
+        });
+    }
+
     self.watchModel = function (modelName)
     {
         log('Watching: ' + modelName);
