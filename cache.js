@@ -22,6 +22,8 @@ module.exports = function (app, options)
 
     self.findObj = function (modelName, key, value)
     {
+        if (!self[modelName]) return;
+
         log('findObj: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
 
         return Object.keys(self[modelName]).map(function (k)
@@ -35,6 +37,8 @@ module.exports = function (app, options)
 
     self.findObjs = function (modelName, key, value)
     {
+        if (!self[modelName]) return [];
+
         log('findObjs: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
 
         return Object.keys(self[modelName]).map(function (k)
