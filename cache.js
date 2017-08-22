@@ -8,23 +8,15 @@ module.exports = function (app, options)
 
     if (options && options.type === 'client') clientSide(self, app, options);
     else if (options && options.type === 'server') serverSide(self, app, options);
+    else if (options && options.type === 'local') localSide(self, app, options);
     else if (options && options.type)
     {
         throw new Error('Type "' + options.type + '"" is not valid. Use "server" or "client"');
     }
 
-    self.debug = options && options.debug || false;
-
-    var log = function (msg)
-    {
-        if (self.debug) console.info(msg);
-    }
-
     self.findObj = function (modelName, key, value)
     {
         if (!self[modelName]) return;
-
-        log('findObj: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
 
         return Object.keys(self[modelName]).map(function (k)
         {
@@ -39,8 +31,6 @@ module.exports = function (app, options)
     {
         if (!self[modelName]) return [];
 
-        log('findObjs: ' + modelName + ' and cache has: ' + Object.keys(self[modelName]).length);
-
         return Object.keys(self[modelName]).map(function (k)
         {
             return self[modelName][k];
@@ -52,23 +42,19 @@ module.exports = function (app, options)
 
     self.watchModel = function (modelName)
     {
-        log('Watching: ' + modelName);
-
         if (self[modelName]) return;
 
         self[modelName] = {};
 
-        return self.broadcasters.reduce(function (prev, curr, idx)
+        if (self.broadcasters) return self.broadcasters.reduce(function (prev, curr, idx)
         {
             return prev.then(function ()
             {
-                log('Asking ' + curr);
                 return self.ask(curr,
                 {
                     model: modelName
                 }).then(function (res)
                 {
-                    log('Received: ' + res.length);
                     res.forEach(function (obj)
                     {
                         self[modelName][obj.id] = obj;
@@ -76,6 +62,14 @@ module.exports = function (app, options)
                 }).catch(console.error);
             });
         }, Promise.resolve());
+
+        else return self.ask(modelName).then(function (res)
+        {
+            res.forEach(function (obj)
+            {
+                self[modelName][obj.id] = obj;
+            });
+        }).catch(console.error);
     }
 
     return self;
@@ -266,6 +260,131 @@ function serverSide(cache, app, options)
                 return cache.send(curr, data).catch(console.error);
             });
         }, Promise.resolve());
+    }
+}
+
+/**
+ * Local side broadcasting
+ */
+function localSide(cache, app, options)
+{
+    if (!app) throw new Error('app is required for cache server');
+
+    cache.ask = function (modelName)
+    {
+        var Model = app.models[modelName];
+
+        if (!Model) throw new Error('No model found with name ' + modelName);
+
+        if (cache.modelsWatched.indexOf(modelName) < 0)
+        {
+            cache.modelsWatched.push(modelName);
+
+            Model.observe('after save', cache.hook);
+            Model.observe('before delete', cache.deleteHook);
+        }
+
+        return Model.find();
+    };
+
+    cache.modelsWatched = [];
+
+    //Formats data and calls Master Hooker
+    cache.hook = function (ctx, next)
+    {
+        // Clone the instance or fallback to the data
+        var instance = null;
+        if (ctx.instance) instance = JSON.parse(JSON.stringify(ctx.instance));
+        else if (ctx.data) instance = JSON.parse(JSON.stringify(ctx.data));
+        else return next();
+
+        // Get the instance Id
+        var modelId;
+        if (instance.id) modelId = instance.id;
+        else if (ctx.where && ctx.where.id) modelId = ctx.where.id;
+        if (!modelId) return next();
+
+        var modelName = getModelName(ctx);
+        if (!modelName) return next();
+
+        var method = ctx.isNewInstance ? 'create' : 'update';
+
+        Promise.resolve().then(function ()
+        {
+            if (typeof modelId !== 'number')
+            {
+                if (modelId.inq && Array.isArray(modelId.inq))
+                {
+                    return modelId.inq.reduce(function (prev, curr, idx)
+                    {
+                        return prev.then(function ()
+                        {
+                            if (typeof curr === 'number') return cache.emit(
+                            {
+                                modelName: modelName,
+                                methodName: method,
+                                modelId: curr,
+                                data: instance
+                            }).catch(console.error);
+                        });
+                    }, Promise.resolve());
+                }
+            }
+            else return cache.emit(
+            {
+                modelName: modelName,
+                methodName: method,
+                modelId: modelId,
+                data: instance
+            });
+
+        }).then(function ()
+        {
+            next();
+        }).catch(next);
+    }
+
+    //Formats data and calls Master Hooker
+    cache.deleteHook = function (ctx, next)
+    {
+        var modelName = getModelName(ctx);
+        if (!modelName) return next();
+
+        var Model = app.models[modelName];
+
+        Model.find(
+        {
+            where: ctx.where
+        }).then(function (models)
+        {
+            if (!models || models.length < 1) return;
+
+            return models.reduce(function (prev, curr, idx)
+            {
+                return prev.then(function ()
+                {
+                    return cache.emit(
+                    {
+                        modelName: modelName,
+                        methodName: 'delete',
+                        modelId: curr.id
+                    }).catch(console.error);
+                });
+            }, Promise.resolve());
+        }).catch(console.error).then(next);
+    }
+
+    cache.emit = function (data)
+    {
+        var localData = cache[data.modelName];
+
+        // If there is not even an empty dictionary for this modelName
+        // if means this cache is not listening for the model, so only
+        // add the data if we actually care about it
+        if (data.data && localData) localData[data.data.id] = data.data;
+
+        // If there is no data, it means it's a deletion
+        else if (data.modelId && data.methodName === 'delete') delete localData[data.modelId];
     }
 }
 
