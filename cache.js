@@ -479,7 +479,7 @@ function clientSide(cache, options)
     let subs = [];
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
     {
-        modelsToNotify = cache.modelsToWatch;
+        modelsToNotify = JSON.parse(JSON.stringify(cache.modelsToWatch));
 
         //Add cache models to sub list
         subs = subs.concat(Object.keys(cache.modelsToWatch).map(m =>
