@@ -1,35 +1,31 @@
 # loopback-cache-machine
-Caching system for Loopback, maintained over webhook
+Caching system for Loopback, maintained via GoogleCloud PubSub
 
 ### Usage client side
 
 In a boot script
 ```
-// Instanciate with the app
-var cache = new require('loopback-cache-machine')(app,
+// Instanciate with the app and tell it what model name to listen to
+var cache = require('loopback-cache-machine')(app,
 {
     type: 'client',
-    broadcasters: [app.get('url')],
-    ask: function (uri, data)
-    {
-        return rp(
-        {
-            method: 'POST',
-            uri: uri,
-            body: data,
-            json: true
-        });
+    serviceName: CACHE_CLIENT_NAME,
+    projectId: GOOGLE_CLOUD_PROJECT_ID,
+    modelsToWatch: [{modelName: 'Customer'}],
+    //Optional event config
+    eventConfig: {
+        events: ['Order.create', 'Order.update', 'Order.delete'],
+        //eventFn will trigger for all events
+        eventFn: function(modelName, methodName, modelId, data, cb) {...}
     }
 });
-
-// And tell it what model name to listen to
-cache.watchModel('Customer');
 ```
+
 
 Then in the models you want to use cache
 ```
-// Require the cache with no params
-var cache = new require('loopback-cache-machine')();
+// Require the cache with options.serviceName
+var cache = require('loopback-cache-machine')(app, {serviceName: CACHE_NAME});
 
 // And boom you have access to cached data
 var customer = cache.Customer[_customer_id_];
@@ -40,23 +36,39 @@ var customer = cache.Customer[_customer_id_];
 
 In a boot script
 ```
-// Prepare the network request handler (needs to be passed,
-// to avoid unnecessary dependencies on cache machine)
-var rp = require('request-promise');
+
 // Instanciate with the app
-var cacheServer = new require('loopback-cache-machine')(app,
+var cacheServer = require('loopback-cache-machine')(app,
 {
     type: 'server',
-    receivers: [app.get('url')],
-    send: function (uri, data)
-    {
-        return rp(
-        {
-            method: 'POST',
-            uri: uri,
-            body: data,
-            json: true
-        });
-    }
+    serviceName: CACHE_SERVER_NAME,
+    projectId: GOOGLE_CLOUD_PROJECT_ID,
 });
 ```
+
+### Usage locally
+
+In a boot script
+```
+
+// Instanciate with the app
+var cacheServer = require('loopback-cache-machine')(app,
+{
+    type: 'local',
+    projectId: GOOGLE_CLOUD_PROJECT_ID
+    modelsToWatch: [{modelName: 'Customer'}]
+});
+```
+Then in the models you want to use cache
+```
+// Require the cache with options.serviceName
+var cache = require('loopback-cache-machine')(app, {serviceName: CACHE_NAME});
+
+// And boom you have access to cached data
+var customer = cache.Customer[_customer_id_];
+```
+
+### Notes
+* Multiple caches and cache types may exist on a single app instance, but only one per name.
+* The cache is not initialized and primed with data until called with a valid `options.type` (server/client/local).
+* `process.env.NODE_ENV` is required, as it is used to differentiate topic and subscription names by environment on Google PubSub.
