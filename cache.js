@@ -74,8 +74,10 @@ function Cache(app, options)
     }
 
 
-    self.watchModels = function (target, modelsToWatch)
+    self.watchModels = function (modelsToWatch)
     {
+        modelsToWatch = modelsToWatch || [];
+        const target = {};
         modelsToWatch.forEach(m =>
         {
             if (!m || !m.modelName) throw new Error('Modelname is required for watching models');
@@ -89,6 +91,7 @@ function Cache(app, options)
                 fields: fields
             };
         });
+        return target;
     }
 
 
@@ -470,7 +473,7 @@ function clientSide(cache, options)
     let modelsToNotify = {};
 
     cache.modelsToWatch = {};
-    cache.watchModels(cache.modelsToWatch, (options.modelsToWatch || []));
+    cache.modelsToWatch = cache.watchModels(options.modelsToWatch);
 
     //On boot, prime the cache by creating subs and a request message to the cache publisher
     let subs = [];
@@ -593,8 +596,7 @@ function localSide(cache, app, options)
     }
 
     cache.modelsWatched = [];
-    cache.modelsToWatch = {};
-    cache.watchModels(cache.modelsToWatch, (options.modelsToWatch || []));
+    cache.modelsToWatch = cache.watchModels(options.modelsToWatch);
 
     //On boot, prime the cache
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
