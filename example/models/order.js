@@ -1,4 +1,8 @@
-var cache = new require('../../cache.js')();
+var cache = require('../../cache.js')(
+{},
+{
+    serviceName: 'test'
+});
 
 module.exports = function (Order)
 {

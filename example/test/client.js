@@ -1,6 +1,5 @@
 var app = require('../server.js');
 var expect = require('chai').expect;
-var rp = require('request-promise');
 
 app.start();
 
@@ -11,28 +10,19 @@ describe('Test order hook', function ()
 
     before(function (done)
     {
-        var options = {
-            method: 'POST',
-            uri: app.get('url') + 'cache/receiver',
-            body:
-            {
-                modelName: 'Customer',
-                methodName: 'Update',
-                data:
-                {
-                    id: customerId,
-                    name: customerName
-                }
-            },
-            json: true
+        //Prime the cache
+        var cache = require('../../cache.js')(app,
+        {
+            serviceName: 'test'
+        });
+        cache.cached.Customer[customerId] = {
+            id: customerId,
+            name: customerName
         };
 
-        rp(options).then(function (res)
+        app.models.Order.create(
         {
-            return app.models.Order.create(
-            {
-                customerId: customerId
-            });
+            customerId: customerId
         }).then(function ()
         {
             done();
