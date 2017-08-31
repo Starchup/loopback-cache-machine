@@ -1,38 +1,38 @@
 module.exports = function startCache(app)
 {
-    // Server
-    var rp = require('request-promise');
-    var cacheServer = new require('../../cache.js')(app,
+    if (process.env.NODE_ENV !== 'testing')
     {
-        type: 'server',
-        receivers: [app.get('url')],
-        send: function (uri, data)
+        // Server
+        var cacheServer = require('../../cache.js')(app,
         {
-            return rp(
-            {
-                method: 'POST',
-                uri: uri,
-                body: data,
-                json: true
-            });
-        }
-    });
+            type: 'server',
+            serviceName: 'test-server',
+            projectId: process.env.GCLOUD_PROJECT_TEST
+        });
 
-    // Client
-    var cacheClient = new require('../../cache.js')(app,
-    {
-        type: 'client',
-        broadcasters: [app.get('url')],
-        ask: function (uri, data)
+        // Client
+        var cacheClient = require('../../cache.js')(app,
         {
-            return rp(
+            type: 'client',
+            serviceName: 'test',
+            projectId: process.env.GCLOUD_PROJECT_TEST,
+            modelsToWatch: [
             {
-                method: 'POST',
-                uri: uri,
-                body: data,
-                json: true
-            });
-        }
-    });
-    cacheClient.watchModel('Customer');
+                modelName: 'Customer'
+            }],
+        });
+    }
+    else
+    {
+        var cacheLocal = require('../../cache.js')(app,
+        {
+            type: 'local',
+            serviceName: 'test',
+            modelsToWatch: [
+            {
+                modelName: 'Customer'
+            }],
+        });
+    }
+
 };

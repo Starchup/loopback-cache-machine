@@ -1,6 +1,5 @@
 var app = require('../server.js');
 var expect = require('chai').expect;
-var rp = require('request-promise');
 
 describe('Test cache emitting', function ()
 {
@@ -19,7 +18,10 @@ describe('Test cache emitting', function ()
 
     it('should find the customer cached', function (done)
     {
-        var cache = new require('../../cache.js')();
+        var cache = require('../../cache.js')(app,
+        {
+            serviceName: 'test'
+        });
 
         expect(cache.Customer).to.exist;
         expect(cache.Customer[customerData.id]).to.exist;
