@@ -167,7 +167,7 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
     });
 }
 
-//Parses existing pubsun topics for models to always watch
+//Parses existing pubsub topics for models to always watch
 function getExistingModelsWatched(pubsub)
 {
     const topicNameRegex = /.*topics\/([a-zA-Z\-]*).*/;
