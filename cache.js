@@ -32,6 +32,7 @@ module.exports = function (app, options)
  * @param {string} options.type - Cache machine type.  May be server/client/local. Inclusion triggers init.
  * @param {string} options.projectId - Google Cloud Project Id.  Required for server/client.
  * @param {object[]} [options.modelsToWatch] - Models to watch and cache.  Used when options.type is client.
+ * @param {function[]} [filters] - Array of functions taking modelsName, method, instance and ctx. Return false to block publishing on server
  * @param {object} [options.eventConfig] - Event configuration object.  Used when options.type is client.
  * @param {array} [options.eventConfig.events] - Array of events to react to, in form "Model.method".
  * @param {function} [options.eventConfig.eventFn] - Function to call when any event is triggered.
@@ -105,6 +106,11 @@ function Cache(app, options)
         throw new Error('Type "' + options.type + '"" is not valid. Valid options: client/server/local');
     }
 
+    if (options && options.filters)
+    {
+        if (getType(options.filters) !== 'Array') throw new Error('options.filters must be an array of functions');
+        self.filters = options.filters;
+    }
     self.type = options.type;
     return self;
 }
@@ -310,6 +316,16 @@ function publishCb(err, res)
 }
 
 /* Model Hook helpers */
+function shouldPublish(cache, modelName, methodName, instance, ctx)
+{
+    if (!cache.filters || !cache.filters.length) return;
+    return cache.filters.every(fn =>
+    {
+        //Silently skip improper filters
+        if (getType(fn) !== 'Function') return true;
+        return fn(modelName, methodName, instance, ctx);
+    });
+}
 
 //Returns a function that watches model crection changes and publishes them
 function afterSaveHook(cache)
@@ -333,6 +349,8 @@ function afterSaveHook(cache)
 
         const method = ctx.isNewInstance ? 'create' : 'update';
         const topicName = [modelName, method].join(sep);
+
+        if (!shouldPublish(cache, modelName, method, instance, ctx)) return next();
 
         Promise.resolve().then(() =>
         {
@@ -375,7 +393,9 @@ function beforeDeleteHook(cache)
         if (!modelName) return next();
 
         const Model = app.models[modelName];
-        const topicName = [modelName, 'delete'].join(sep);
+        const methodName = 'delete';
+        const topicName = [modelName, methodName].join(sep);
+
 
         Model.find(
         {
@@ -387,10 +407,12 @@ function beforeDeleteHook(cache)
             {
                 return prev.then(() =>
                 {
+                    if (!shouldPublish(cache, modelName, methodName, curr, ctx)) return Promise.resolve();
+
                     return cache.emit(
                     {
                         modelName: modelName,
-                        methodName: 'delete',
+                        methodName: methodName,
                         modelId: curr.id
                     }, topicName).catch(console.error);
                 });

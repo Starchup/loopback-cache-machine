@@ -43,6 +43,8 @@ var cacheServer = require('loopback-cache-machine')(app,
     type: 'server',
     serviceName: CACHE_SERVER_NAME,
     projectId: GOOGLE_CLOUD_PROJECT_ID,
+    //Optional list of functions taking (modelName, methodName, instance, ctx) as arguments. If any return false, message will not be published
+    filters: [filterFunction1, filterFunction2]
 });
 ```
 
