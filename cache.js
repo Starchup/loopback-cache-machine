@@ -318,7 +318,7 @@ function publishCb(err, res)
 /* Model Hook helpers */
 function shouldPublish(cache, modelName, methodName, instance, ctx)
 {
-    if (!cache.filters || !cache.filters.length) return;
+    if (!cache.filters || !cache.filters.length) return true;
     return cache.filters.every(fn =>
     {
         //Silently skip improper filters
