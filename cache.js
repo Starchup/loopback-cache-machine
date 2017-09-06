@@ -385,7 +385,7 @@ function afterSaveHook(cache)
 }
 
 //Returns a function that watches model deletions and publishes them
-function beforeDeleteHook(cache)
+function beforeDeleteHook(cache, app)
 {
     return function (ctx, next)
     {
@@ -463,7 +463,7 @@ function setModelsWatched(app, cache, models)
         cache.modelsWatched.push(m);
 
         Model.observe('after save', afterSaveHook(cache));
-        Model.observe('before delete', beforeDeleteHook(cache));
+        Model.observe('before delete', beforeDeleteHook(cache, app));
     });
 }
 
