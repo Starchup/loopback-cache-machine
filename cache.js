@@ -167,7 +167,7 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
 
             //Bind default event handlers with helpful contextual params
             const messageHandler = onMessage || defaultMessageHandler.bind(null, topic, subscription, cache);
-            const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription, cache);
+            const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription);
 
             //Handlers will receive message object as param
             subscription.on('message', messageHandler);
