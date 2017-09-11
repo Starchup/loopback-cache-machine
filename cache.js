@@ -285,14 +285,16 @@ function receiveCacheData(cache, data)
     let errorMsg;
     data.forEach(d =>
     {
+        const modelId = d.data && d.data.id ? d.data.id : d.modelId;
+
         if (!d) errorMsg = 'message data is required';
         else if (!d.modelName) errorMsg = 'modelName is required';
         else if (!d.methodName) errorMsg = 'methodName is required';
         else if (d.methodName === 'create' && !d.data) errorMsg = 'data is required for create';
         else if (d.methodName === 'update' && !d.data) errorMsg = 'data is required for update';
-        else if (d.methodName === 'create' && !d.data.id) errorMsg = 'model id is required for create';
-        else if (d.methodName === 'update' && !d.data.id) errorMsg = 'model id is required for update';
-        else if (d.methodName === 'delete' && !d.modelId) errorMsg = 'modelId is required for deletion';
+        else if (d.methodName === 'create' && !modelId) errorMsg = 'model id is required for create';
+        else if (d.methodName === 'update' && !modelId) errorMsg = 'model id is required for update';
+        else if (d.methodName === 'delete' && !modelId) errorMsg = 'model id is required for deletion';
 
         if (errorMsg) return console.error(`${errorMsg} ${JSON.stringify(d)}`);
         else
@@ -302,7 +304,7 @@ function receiveCacheData(cache, data)
             // If there is not even an empty dictionary for this modelName
             // if means this cache is not listening for the model, so only
             // add the data if we actually care about it
-            if (d.data && localData) localData[d.data.id] = d.data;
+            if (d.data && localData) localData[modelId] = d.data;
 
             // If there is no data, it means it's a deletion
             else if (d.modelId && d.methodName === 'delete') delete localData[d.modelId];
@@ -606,11 +608,12 @@ function localSide(cache, app, options)
     cache.emit = function (data)
     {
         const localData = cache.cached[data.modelName];
+        const modelId = data.data && data.data.id ? data.data.id : data.modelId;
 
         // If there is not even an empty dictionary for this modelName
         // if means this cache is not listening for the model, so only
         // add the data if we actually care about it
-        if (data.data && localData) localData[data.data.id] = data.data;
+        if (data.data && localData) localData[modelId] = data.data;
 
         // If there is no data, it means it's a deletion
         else if (data.modelId && data.methodName === 'delete') delete localData[data.modelId];
