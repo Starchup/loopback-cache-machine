@@ -33,6 +33,7 @@ module.exports = function (app, options)
  * @param {string} options.projectId - Google Cloud Project Id.  Required for server/client.
  * @param {object[]} [options.modelsToWatch] - Models to watch and cache.  Used when options.type is client.
  * @param {function[]} [filters] - Array of functions taking modelsName, method, instance and ctx. Return false to block publishing on server
+ * @param {function} [options.onReady] - Callback function called when cache is primed with data (client/local) or ready to publish (server). Success response is true for server side, and cached data for client/local.
  * @param {object} [options.eventConfig] - Event configuration object.  Used when options.type is client.
  * @param {array} [options.eventConfig.events] - Array of events to react to, in form "Model.method".
  * @param {function} [options.eventConfig.eventFn] - Function to call when any event is triggered.
@@ -111,6 +112,13 @@ function Cache(app, options)
         if (getType(options.filters) !== 'Array') throw new Error('options.filters must be an array of functions');
         self.filters = options.filters;
     }
+
+    if(options && options.onReady)
+    {
+        if(getType(options.onReady) !== 'Function') throw new Error('options.onReady must be a function');
+        self.onReady = options.onReady;
+    }
+
     self.type = options.type;
     return self;
 }
@@ -220,6 +228,7 @@ function createCache(cache, message)
     let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
+    if(cache.onReady) cache.onReady(null, cache.cached);
 }
 
 //On cache creation request, find the data, record which models to watch, and send
@@ -561,6 +570,9 @@ function clientSide(cache, options)
     }).then(topic =>
     {
         topic.publish(modelsToNotify, publishCb);
+    }).catch(e => {
+        if(cache.onReady) return cache.onReady(e);
+        else throw e;
     });
 }
 
@@ -583,7 +595,12 @@ function serverSide(cache, app, options)
         const msgHandler = primeCache.bind(null, cache, app);
 
         //Listen for cache creation requests, find data and publish back
-        registerSubscription(cache, cache.pubsub, 'start-cache-client', null, msgHandler);
+        registerSubscription(cache, cache.pubsub, 'start-cache-client', null, msgHandler).then(() => {
+            if(cache.onReady) cache.onReady(null, true);
+        });
+    }).catch(e => {
+        if(cache.onReady) return cache.onReady(e);
+        else throw e;
     });
 
     //Cache-type specific emitter/publisher
@@ -638,6 +655,10 @@ function localSide(cache, app, options)
                     localData[datum.id] = datum;
                 });
             });
+            if(cache.onReady) cache.onReady(null, cache.cached);
+        }).catch(e => {
+            if(cache.onReady) return cache.onReady(e);
+            else throw e;
         });
     }
 }
