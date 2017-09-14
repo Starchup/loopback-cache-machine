@@ -18,6 +18,8 @@ var cache = require('loopback-cache-machine')(app,
         //eventFn will trigger for all events
         eventFn: function(modelName, methodName, modelId, data, cb) {...}
     }
+    //Optional readiness callback, res is intitial cached data on success
+    onReady: function(err, res) { .... }
 });
 ```
 
@@ -28,7 +30,7 @@ Then in the models you want to use cache
 var cache = require('loopback-cache-machine')(app, {serviceName: CACHE_NAME});
 
 // And boom you have access to cached data
-var customer = cache.Customer[_customer_id_];
+var customer = cache.cached.Customer[_customer_id_];
 ```
 
 
@@ -44,7 +46,9 @@ var cacheServer = require('loopback-cache-machine')(app,
     serviceName: CACHE_SERVER_NAME,
     projectId: GOOGLE_CLOUD_PROJECT_ID,
     //Optional list of functions taking (modelName, methodName, instance, ctx) as arguments. If any return false, message will not be published
-    filters: [filterFunction1, filterFunction2]
+    filters: [filterFunction1, filterFunction2],
+    //Optional readiness callback, res is true on success
+    onReady: function(err, res) { .... }
 });
 ```
 
@@ -58,7 +62,9 @@ var cacheServer = require('loopback-cache-machine')(app,
 {
     type: 'local',
     projectId: GOOGLE_CLOUD_PROJECT_ID
-    modelsToWatch: [{modelName: 'Customer'}]
+    modelsToWatch: [{modelName: 'Customer'}],
+    //Optional readiness callback, res is intitial cached data on success
+    onReady: function(err, res) { .... }
 });
 ```
 Then in the models you want to use cache
@@ -67,7 +73,7 @@ Then in the models you want to use cache
 var cache = require('loopback-cache-machine')(app, {serviceName: CACHE_NAME});
 
 // And boom you have access to cached data
-var customer = cache.Customer[_customer_id_];
+var customer = cache.cached.Customer[_customer_id_];
 ```
 
 ### Notes
