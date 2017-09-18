@@ -119,6 +119,7 @@ function Cache(app, options)
         self.onReady = options.onReady;
     }
 
+    self.serviceName = options.serviceName;
     self.type = options.type;
     return self;
 }
@@ -234,10 +235,11 @@ function createCache(cache, message)
 //On cache creation request, find the data, record which models to watch, and send
 function primeCache(cache, app, message)
 {
-    const data = message.data;
+    const models = message.data.models;
+    const responseSubName = message.data.responseSubName;
     let dataToPublish = [];
 
-    getCacheData(app, cache, data).then(res =>
+    getCacheData(app, cache, models).then(res =>
     {
         res.forEach(d =>
         {
@@ -252,7 +254,7 @@ function primeCache(cache, app, message)
             });
             dataToPublish = dataToPublish.concat(dataToAdd);
         });
-        return createTopic(cache.pubsub, 'create-cache');
+        return createTopic(cache.pubsub, responseSubName);
     }).then(topic =>
     {
         topic.publish(JSON.stringify(dataToPublish), publishCb);
@@ -555,21 +557,30 @@ function clientSide(cache, options)
         registerSubscription(cache, cache.pubsub, s.topicName, s.subName);
     });
 
+    let responseSubName;
+
     //Register model-based subscriptions (cache-update and event)
     return Promise.all(subPromises).then(() =>
     {
+        //Tell the publisher what topic to subscribe to so only this service gets the result
+        responseSubName = ['create-cache', cache.serviceName].join(sep);
+
         //Bind cache as first param
         const cacheHandler = createCache.bind(null, cache);
 
         //Register a special subscription for cache creation
-        return registerSubscription(cache, cache.pubsub, 'create-cache', null, cacheHandler);
+        return registerSubscription(cache, cache.pubsub, responseSubName, null, cacheHandler);
     }).then(() =>
     {
         //Notify publishers of client start
         return createTopic(cache.pubsub, 'start-cache-client');
     }).then(topic =>
     {
-        topic.publish(modelsToNotify, publishCb);
+        topic.publish(
+        {
+            responseSubName: responseSubName,
+            models: modelsToNotify
+        }, publishCb);
     }).catch(e =>
     {
         if (cache.onReady) return cache.onReady(e);
