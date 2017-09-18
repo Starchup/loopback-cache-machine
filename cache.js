@@ -219,16 +219,10 @@ function getExistingModelsWatched(pubsub)
 function defaultMessageHandler(topic, subscription, cache, message)
 {
     topic = topic[0] || topic;
-    if (topic.name.indexOf('FacilityBillingAddress') >= 0)
-    {
-        console.error('Got FacBill message');
-        console.log('Topic', topic.name);
-        console.log('Sub', subscription.name);
-    }
 
     let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
     if (getType(data) !== 'Array') data = [data];
-    receiveCacheData(cache, data);
+    receiveCacheData(cache, data, topic, subscription);
     handleEvent(cache, data);
 }
 
@@ -299,7 +293,7 @@ function handleEvent(cache, data)
 }
 
 //Receive individual model update data
-function receiveCacheData(cache, data)
+function receiveCacheData(cache, data, topic, sub)
 {
     let errorMsg;
     data.forEach(d =>
@@ -322,7 +316,21 @@ function receiveCacheData(cache, data)
             // If there is not even an empty dictionary for this modelName
             // if means this cache is not listening for the model, so only
             // add the data if we actually care about it
-            if (!localData) return;
+            if (!localData)
+            {
+                const modelEvent = `${d.modelName}.${d.methodName}`;
+                if (cache.eventList[modelEvent]) return;
+
+                //Non-primed, non-event messages
+                let tpcSubCtx = '';
+                console.error('Unrecognized message: ' + JSON.stringify(data));
+                if (topic) tpcSubCtx += 'Topic: ' + topic.name;
+                if (sub) tpcSubCtx += ' ,sub: ' + sub.name;
+                console.error(tpcSubCtx);
+
+
+                return;
+            }
             if (d.data) localData[modelId] = d.data;
 
             // If there is no data, it means it's a deletion
