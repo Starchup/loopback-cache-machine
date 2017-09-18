@@ -173,6 +173,8 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
             //Google return format, always first index in array
             const subscription = subscriptions[0];
 
+            console.info('Registered a subscription for topic ' + topicName + '. Sub name: ' + subscription.name);
+
             //Bind default event handlers with helpful contextual params
             const messageHandler = onMessage || defaultMessageHandler.bind(null, topic, subscription, cache);
             const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription);
