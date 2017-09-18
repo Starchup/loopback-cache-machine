@@ -309,15 +309,14 @@ function receiveCacheData(cache, data)
         else
         {
             const localData = cache.cached[d.modelName];
-            if (!localData) return console.error('Unexpected message received.  Received a message with a model type that is not primed in this cache. Message: ' + JSON.stringify(d));
-
             // If there is not even an empty dictionary for this modelName
             // if means this cache is not listening for the model, so only
             // add the data if we actually care about it
-            if (d.data && localData) localData[modelId] = d.data;
+            if (!localData) return;
+            if (d.data) localData[modelId] = d.data;
 
             // If there is no data, it means it's a deletion
-            else if (localData && d.modelId && d.methodName === 'delete') delete localData[d.modelId];
+            else if (d.modelId && d.methodName === 'delete') delete localData[d.modelId];
         }
     });
 }
