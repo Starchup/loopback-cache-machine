@@ -218,6 +218,14 @@ function getExistingModelsWatched(pubsub)
 //Saves data to cache, and checks if it's a registered event
 function defaultMessageHandler(topic, subscription, cache, message)
 {
+    topic = topic[0] || topic;
+    if (topic.name.indexOf('FacilityBillingAddress') >= 0)
+    {
+        console.error('Got FacBill message');
+        console.log('Topic', topic.name);
+        console.log('Sub', subscription.name);
+    }
+
     let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
