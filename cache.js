@@ -113,9 +113,9 @@ function Cache(app, options)
         self.filters = options.filters;
     }
 
-    if(options && options.onReady)
+    if (options && options.onReady)
     {
-        if(getType(options.onReady) !== 'Function') throw new Error('options.onReady must be a function');
+        if (getType(options.onReady) !== 'Function') throw new Error('options.onReady must be a function');
         self.onReady = options.onReady;
     }
 
@@ -228,7 +228,7 @@ function createCache(cache, message)
     let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
-    if(cache.onReady) cache.onReady(null, cache.cached);
+    if (cache.onReady) cache.onReady(null, cache.cached);
 }
 
 //On cache creation request, find the data, record which models to watch, and send
@@ -309,6 +309,7 @@ function receiveCacheData(cache, data)
         else
         {
             const localData = cache.cached[d.modelName];
+            if (!localData) return console.error('Unexpected message received.  Received a message with a model type that is not primed in this cache. Message: ' + JSON.stringify(d));
 
             // If there is not even an empty dictionary for this modelName
             // if means this cache is not listening for the model, so only
@@ -316,7 +317,7 @@ function receiveCacheData(cache, data)
             if (d.data && localData) localData[modelId] = d.data;
 
             // If there is no data, it means it's a deletion
-            else if (d.modelId && d.methodName === 'delete') delete localData[d.modelId];
+            else if (localData && d.modelId && d.methodName === 'delete') delete localData[d.modelId];
         }
     });
 }
@@ -570,8 +571,9 @@ function clientSide(cache, options)
     }).then(topic =>
     {
         topic.publish(modelsToNotify, publishCb);
-    }).catch(e => {
-        if(cache.onReady) return cache.onReady(e);
+    }).catch(e =>
+    {
+        if (cache.onReady) return cache.onReady(e);
         else throw e;
     });
 }
@@ -595,11 +597,13 @@ function serverSide(cache, app, options)
         const msgHandler = primeCache.bind(null, cache, app);
 
         //Listen for cache creation requests, find data and publish back
-        registerSubscription(cache, cache.pubsub, 'start-cache-client', null, msgHandler).then(() => {
-            if(cache.onReady) cache.onReady(null, true);
+        registerSubscription(cache, cache.pubsub, 'start-cache-client', null, msgHandler).then(() =>
+        {
+            if (cache.onReady) cache.onReady(null, true);
         });
-    }).catch(e => {
-        if(cache.onReady) return cache.onReady(e);
+    }).catch(e =>
+    {
+        if (cache.onReady) return cache.onReady(e);
         else throw e;
     });
 
@@ -655,9 +659,10 @@ function localSide(cache, app, options)
                     localData[datum.id] = datum;
                 });
             });
-            if(cache.onReady) cache.onReady(null, cache.cached);
-        }).catch(e => {
-            if(cache.onReady) return cache.onReady(e);
+            if (cache.onReady) cache.onReady(null, cache.cached);
+        }).catch(e =>
+        {
+            if (cache.onReady) return cache.onReady(e);
             else throw e;
         });
     }
