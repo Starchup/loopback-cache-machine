@@ -295,6 +295,8 @@ function handleEvent(cache, data)
 //Receive individual model update data
 function receiveCacheData(cache, data, topic, sub)
 {
+    console.log('received: ' + JSON.stringify(data));
+
     let errorMsg;
     data.forEach(d =>
     {
@@ -379,8 +381,11 @@ function afterSaveHook(cache)
         const method = ctx.isNewInstance ? 'create' : 'update';
         const topicName = [modelName, method].join(sep);
 
+        console.log(topicName);
+
         if (!shouldPublish(cache, modelName, method, instance, ctx)) return next();
 
+        console.log('publishing ' + topicName);
         Promise.resolve().then(() =>
         {
             if (typeof modelId !== 'number')
@@ -389,6 +394,7 @@ function afterSaveHook(cache)
                 {
                     modelId.inq.forEach(id =>
                     {
+                        console.log('emitting non num' + topicName + ' ' + id);
                         if (typeof id === 'number') return cache.emit(
                         {
                             modelName: modelName,
@@ -399,13 +405,17 @@ function afterSaveHook(cache)
                     });
                 }
             }
-            else return cache.emit(
+            else
             {
-                modelName: modelName,
-                methodName: method,
-                modelId: modelId,
-                data: instance
-            }, topicName);
+                console.log('emitting ' + topicName + ' ' + modelId);
+                return cache.emit(
+                {
+                    modelName: modelName,
+                    methodName: method,
+                    modelId: modelId,
+                    data: instance
+                }, topicName);
+            }
         }).then(() =>
         {
             next();
@@ -664,8 +674,10 @@ function localSide(cache, app, options)
     //On boot, prime the cache
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
     {
+        console.log('local side getCacheData');
         getCacheData(app, cache, cache.modelsToWatch).then(res =>
         {
+            console.log('local side gotCacheData: ' + JSON.stringify(res));
             res.forEach(d =>
             {
                 const localData = cache.cached[d.modelName];
