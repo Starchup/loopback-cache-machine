@@ -234,6 +234,8 @@ function defaultMessageHandler(topic, subscription, cache, message)
 //Saves data to cache, does not check for events
 function createCache(cache, message)
 {
+    console.log('createCache: ' + JSON.stringify(message));
+
     let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
@@ -547,12 +549,19 @@ function clientSide(cache, options)
         modelsToNotify = JSON.parse(JSON.stringify(cache.modelsToWatch));
 
         //Add cache models to sub list
-        subs = subs.concat(Object.keys(cache.modelsToWatch).map(m =>
+        subs = Object.keys(cache.modelsToWatch).reduce((list, m) =>
         {
-            return {
-                topicName: m + sep + 'update',
-            };
-        }));
+            return list.concat([
+            {
+                topicName: m + sep + 'create'
+            },
+            {
+                topicName: m + sep + 'update'
+            },
+            {
+                topicName: m + sep + 'delete'
+            }]);
+        }, subs);
     }
 
     //Set up event related behavior
