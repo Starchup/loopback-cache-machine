@@ -246,6 +246,8 @@ function primeCache(cache, app, message)
     const data = message.data;
     let dataToPublish = [];
 
+    console.log('primeCache data: ' + JSON.stringify(data));
+
     getCacheData(app, cache, data).then(res =>
     {
         res.forEach(d =>
