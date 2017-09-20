@@ -517,12 +517,19 @@ function clientSide(cache, options)
         modelsToNotify = JSON.parse(JSON.stringify(cache.modelsToWatch));
 
         //Add cache models to sub list
-        subs = subs.concat(Object.keys(cache.modelsToWatch).map(m =>
+        subs = Object.keys(cache.modelsToWatch).reduce((list, m) =>
         {
-            return {
-                topicName: m + sep + 'update',
-            };
-        }));
+            return list.concat([
+            {
+                topicName: m + sep + 'create'
+            },
+            {
+                topicName: m + sep + 'update'
+            },
+            {
+                topicName: m + sep + 'delete'
+            }]);
+        }, subs);
     }
 
     //Set up event related behavior
