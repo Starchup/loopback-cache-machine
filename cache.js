@@ -220,6 +220,11 @@ function defaultMessageHandler(topic, subscription, cache, message)
 {
     topic = topic[0] || topic;
 
+    console.log();
+    console.log('message: ' + JSON.stringify(message));
+    console.log('topic: ' + topic.name);
+    console.log('message: ' + subscription.name);
+
     let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data, topic, subscription);
@@ -295,8 +300,6 @@ function handleEvent(cache, data)
 //Receive individual model update data
 function receiveCacheData(cache, data, topic, sub)
 {
-    console.log('received: ' + JSON.stringify(data));
-
     let errorMsg;
     data.forEach(d =>
     {
@@ -329,7 +332,6 @@ function receiveCacheData(cache, data, topic, sub)
                 if (topic) tpcSubCtx += 'Topic: ' + topic.name;
                 if (sub) tpcSubCtx += ' ,sub: ' + sub.name;
                 console.error(tpcSubCtx);
-
 
                 return;
             }
