@@ -599,6 +599,8 @@ function clientSide(cache, options)
         return createTopic(cache.pubsub, 'start-cache-client');
     }).then(topic =>
     {
+        console.log('client side emitting start cache client: ' + JSON.stringify(modelsToNotify));
+
         topic.publish(modelsToNotify, publishCb);
     }).catch(e =>
     {
@@ -639,6 +641,8 @@ function serverSide(cache, app, options)
     //Cache-type specific emitter/publisher
     cache.emit = function (data, topicName)
     {
+        console.log('server emitting: ' + topicName + ' with data: ' + JSON.stringify(data));
+
         if (!topicName) throw new Error('Publishing message requires topic name');
         return createTopic(cache.pubsub, topicName).then(topic =>
         {
