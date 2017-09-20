@@ -174,6 +174,8 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
             //Google return format, always first index in array
             const subscription = subscriptions[0];
 
+            console.info('Registered a subscription for topic ' + topicName + '. Sub name: ' + subscription.name);
+
             //Bind default event handlers with helpful contextual params
             const messageHandler = onMessage || defaultMessageHandler.bind(null, topic, subscription, cache);
             const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription);
@@ -217,9 +219,16 @@ function getExistingModelsWatched(pubsub)
 //Saves data to cache, and checks if it's a registered event
 function defaultMessageHandler(topic, subscription, cache, message)
 {
+    topic = topic[0] || topic;
+
+    console.log();
+    console.log('message: ' + JSON.stringify(message));
+    console.log('topic: ' + topic.name);
+    console.log('message: ' + subscription.name);
+
     let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
     if (getType(data) !== 'Array') data = [data];
-    receiveCacheData(cache, data);
+    receiveCacheData(cache, data, topic, subscription);
     handleEvent(cache, data);
 }
 
@@ -291,7 +300,7 @@ function handleEvent(cache, data)
 }
 
 //Receive individual model update data
-function receiveCacheData(cache, data)
+function receiveCacheData(cache, data, topic, sub)
 {
     let errorMsg;
     data.forEach(d =>
@@ -314,7 +323,20 @@ function receiveCacheData(cache, data)
             // If there is not even an empty dictionary for this modelName
             // if means this cache is not listening for the model, so only
             // add the data if we actually care about it
-            if (!localData) return;
+            if (!localData)
+            {
+                const modelEvent = `${d.modelName}.${d.methodName}`;
+                if (cache.eventList[modelEvent]) return;
+
+                //Non-primed, non-event messages
+                let tpcSubCtx = '';
+                console.error('Unrecognized message: ' + JSON.stringify(data));
+                if (topic) tpcSubCtx += 'Topic: ' + topic.name;
+                if (sub) tpcSubCtx += ' ,sub: ' + sub.name;
+                console.error(tpcSubCtx);
+
+                return;
+            }
             if (d.data) localData[modelId] = d.data;
 
             // If there is no data, it means it's a deletion
@@ -363,8 +385,11 @@ function afterSaveHook(cache)
         const method = ctx.isNewInstance ? 'create' : 'update';
         const topicName = [modelName, method].join(sep);
 
+        console.log(topicName);
+
         if (!shouldPublish(cache, modelName, method, instance, ctx)) return next();
 
+        console.log('publishing ' + topicName);
         Promise.resolve().then(() =>
         {
             if (typeof modelId !== 'number')
@@ -373,6 +398,7 @@ function afterSaveHook(cache)
                 {
                     modelId.inq.forEach(id =>
                     {
+                        console.log('emitting non num' + topicName + ' ' + id);
                         if (typeof id === 'number') return cache.emit(
                         {
                             modelName: modelName,
@@ -383,13 +409,17 @@ function afterSaveHook(cache)
                     });
                 }
             }
-            else return cache.emit(
+            else
             {
-                modelName: modelName,
-                methodName: method,
-                modelId: modelId,
-                data: instance
-            }, topicName);
+                console.log('emitting ' + topicName + ' ' + modelId);
+                return cache.emit(
+                {
+                    modelName: modelName,
+                    methodName: method,
+                    modelId: modelId,
+                    data: instance
+                }, topicName);
+            }
         }).then(() =>
         {
             next();
@@ -657,8 +687,10 @@ function localSide(cache, app, options)
     //On boot, prime the cache
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
     {
+        console.log('local side getCacheData');
         getCacheData(app, cache, cache.modelsToWatch).then(res =>
         {
+            console.log('local side gotCacheData: ' + JSON.stringify(res));
             res.forEach(d =>
             {
                 const localData = cache.cached[d.modelName];
