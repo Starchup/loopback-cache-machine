@@ -98,6 +98,7 @@ function Cache(app, options)
 
 
     if (options && !options.serviceName) throw new Error('options.serviceName is required');
+    self.serviceName = options.serviceName;
 
     if (options && options.type === 'client') clientSide(self, options);
     else if (options && options.type === 'server') serverSide(self, app, options);
@@ -118,8 +119,6 @@ function Cache(app, options)
         if (getType(options.onReady) !== 'Function') throw new Error('options.onReady must be a function');
         self.onReady = options.onReady;
     }
-
-    self.serviceName = options.serviceName;
     self.type = options.type;
     return self;
 }
@@ -131,6 +130,21 @@ const sep = '__';
 function makeTopicName(topicName)
 {
     return topicName + sep + process.env.NODE_ENV;
+}
+
+/*
+ * Creates a subscription name with the following format:
+ * serviceName-environment-timestamp-randomNumber, truncated at 255 chars
+ */
+function makeUniqueSubName(serviceName)
+{
+    //Google name length limit
+    const limit = 255;
+    const timestamp = 't' + Date.now().toString();
+    const random = 'r' + Math.random().toString().replace('0.', '');
+    let subName = [serviceName, process.env.NODE_ENV, timestamp, random].join('-');
+    if(subName.length > limit) subName = subName.substring(0, limit);
+    return subName;
 }
 
 function createTopic(pubsub, topicName, topicOptions)
@@ -168,7 +182,7 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
     //Find or create topic
     return createTopic(pubsub, topicName, topicOptions).then(topic =>
     {
-        const subscriptionName = subName ? subName + sep + process.env.NODE_ENV : null;
+        const subscriptionName = subName ? subName + sep + process.env.NODE_ENV : makeUniqueSubName(cache.serviceName);
         return topic.subscribe(subscriptionName, subscribeOptions).then(subscriptions =>
         {
             //Google return format, always first index in array
