@@ -75,6 +75,47 @@ function Cache(app, options)
         });
     }
 
+    self.complexFindObj = function (modelName, filter)
+    {
+        if (!self.cached[modelName]) return [];
+        var modelsFound = []
+        for (var key in filter)
+        {
+            modelsFound.push(self.findObj(modelName, key, filter[key]));
+        }
+        var commonModels = modelsFound[0].filter(function(model) 
+        {
+          return modelsFound.every(function(modelArray) {
+            if (modelArray.indexOf(model) != -1) {
+              modelArray[modelArray.indexOf(model)] = Infinity;
+              return true;
+            }
+            return false;
+          })
+        })
+        return commonModels;
+    }
+
+    self.complexFindObjs = function (modelName, filter)
+    {
+        if (!self.cached[modelName]) return [];
+        var modelsFound = []
+        for (var key in filter)
+        {
+            modelsFound.push(self.findObjs(modelName, key, filter[key]));
+        }
+        var commonModels = modelsFound[0].filter(function(model) 
+        {
+          return modelsFound.every(function(modelArray) {
+            if (modelArray.indexOf(model) != -1) {
+              modelArray[modelArray.indexOf(model)] = Infinity;
+              return true;
+            }
+            return false;
+          })
+        })
+        return commonModels;
+    }
 
     self.watchModels = function (modelsToWatch)
     {
