@@ -75,10 +75,10 @@ function Cache(app, options)
         });
     }
 
-    self.complexFindObjs = function(modelName, filter)
+    self.complexFindObjs = function(modelName, filterFunction)
     {
         if (!self.cached[modelName]) return [];
-        return self.cached[modelName].filter(filter);
+        return Object.values(self.cached[modelName]).filter(filterFunction);
     }
 
     self.watchModels = function (modelsToWatch)
