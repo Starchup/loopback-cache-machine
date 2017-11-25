@@ -75,10 +75,10 @@ function Cache(app, options)
         });
     }
 
-    self.complexFindObjs = function(modelName, filterFunction)
+    self.complexFindObjs = function (modelName, filterFunction)
     {
         if (!self.cached[modelName]) return [];
-        return Object.values(self.cached[modelName]).filter(filterFunction);
+        return Object.keys(self.cached[modelName]).map(k => self.cached[modelName][k]).filter(filterFunction);
     }
 
     self.watchModels = function (modelsToWatch)
@@ -148,7 +148,7 @@ function makeUniqueSubName(serviceName)
     const timestamp = 't' + Date.now().toString();
     const random = 'r' + Math.random().toString().replace('0.', '');
     let subName = [serviceName, process.env.NODE_ENV, timestamp, random].join('-');
-    if(subName.length > limit) subName = subName.substring(0, limit);
+    if (subName.length > limit) subName = subName.substring(0, limit);
     return subName;
 }
 
