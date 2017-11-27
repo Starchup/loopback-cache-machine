@@ -171,6 +171,12 @@ function createTopic(pubsub, topicName, topicOptions)
     });
 }
 
+function publish(topic, message, cb)
+{
+    var publisher = topic.publisher();
+    publisher.publish(Buffer.from(JSON.stringify(message)), cb);
+}
+
 //Finds/creates a topic and registers a subscriber to that topic
 function registerSubscription(cache, pubsub, topicName, subName, onMessage, onError)
 {
@@ -179,16 +185,11 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
         autoCreate: true
     };
 
-    //Allows us to not have to worry about remembering to acknowledge each message
-    const subscribeOptions = {
-        autoAck: true
-    };
-
     //Find or create topic
     return createTopic(pubsub, topicName, topicOptions).then(topic =>
     {
         const subscriptionName = subName ? subName + sep + process.env.NODE_ENV : makeUniqueSubName(cache.serviceName);
-        return topic.subscribe(subscriptionName, subscribeOptions).then(subscriptions =>
+        return topic.createSubscription(subscriptionName).then(subscriptions =>
         {
             //Google return format, always first index in array
             const subscription = subscriptions[0];
@@ -236,7 +237,9 @@ function getExistingModelsWatched(pubsub)
 //Saves data to cache, and checks if it's a registered event
 function defaultMessageHandler(topic, subscription, cache, message)
 {
-    let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
+    //Immediately acknowledge
+    message.ack();
+    let data = JSON.parse(message.data.toString());
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     handleEvent(cache, data);
@@ -245,7 +248,8 @@ function defaultMessageHandler(topic, subscription, cache, message)
 //Saves data to cache, does not check for events
 function createCache(cache, message)
 {
-    let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
+    message.ack();
+    let data = JSON.parse(message.data.toString());
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     if (cache.onReady) cache.onReady(null, cache.cached);
@@ -254,8 +258,11 @@ function createCache(cache, message)
 //On cache creation request, find the data, record which models to watch, and send
 function primeCache(cache, app, message)
 {
-    const models = message.data.models;
-    const responseSubName = message.data.responseSubName;
+    message.ack()
+
+    const data = JSON.parse(message.data.toString());
+    const models = data.models;
+    const responseSubName = data.responseSubName;
     let dataToPublish = [];
 
     getCacheData(app, cache, models).then(res =>
@@ -276,7 +283,7 @@ function primeCache(cache, app, message)
         return createTopic(cache.pubsub, responseSubName);
     }).then(topic =>
     {
-        topic.publish(JSON.stringify(dataToPublish), publishCb);
+        publish(topic, dataToPublish, publishCb);
     });
 }
 
@@ -602,7 +609,7 @@ function clientSide(cache, options)
         return createTopic(cache.pubsub, 'start-cache-client');
     }).then(topic =>
     {
-        topic.publish(
+        publish(topic,
         {
             responseSubName: responseSubName,
             models: modelsToNotify
@@ -649,7 +656,7 @@ function serverSide(cache, app, options)
         if (!topicName) throw new Error('Publishing message requires topic name');
         return createTopic(cache.pubsub, topicName).then(topic =>
         {
-            topic.publish(JSON.stringify(data), publishCb);
+            publish(topic, data, publishCb);
         });
     }
 }

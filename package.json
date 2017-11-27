@@ -17,6 +17,6 @@
   "homepage": "https://github.com/Starchup/loopback-cache-machine#readme",
   "dependencies":
   {
-    "@google-cloud/pubsub": "0.13.2"
+    "@google-cloud/pubsub": "0.14.7"
   }
 }
