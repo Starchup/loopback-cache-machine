@@ -380,7 +380,7 @@ function afterSaveHook(cache)
         if (!modelName) return next();
 
         const method = ctx.isNewInstance ? 'create' : 'update';
-        const topicName = [modelName, method].join(sep);
+        const topicName = modelName;
 
         if (!shouldPublish(cache, modelName, method, instance, ctx)) return next();
 
@@ -426,7 +426,7 @@ function beforeDeleteHook(cache, app)
 
         const Model = app.models[modelName];
         const methodName = 'delete';
-        const topicName = [modelName, methodName].join(sep);
+        const topicName = modelName;
 
 
         Model.find(
@@ -536,19 +536,7 @@ function clientSide(cache, options)
         modelsToNotify = JSON.parse(JSON.stringify(cache.modelsToWatch));
 
         //Add cache models to sub list
-        subs = Object.keys(cache.modelsToWatch).reduce((list, m) =>
-        {
-            return list.concat([
-            {
-                topicName: m + sep + 'create'
-            },
-            {
-                topicName: m + sep + 'update'
-            },
-            {
-                topicName: m + sep + 'delete'
-            }]);
-        }, subs);
+        subs = Object.keys(cache.modelsToWatch);
     }
 
     //Set up event related behavior
