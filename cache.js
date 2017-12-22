@@ -557,11 +557,12 @@ function clientSide(cache, options)
                 type: 'event'
             };
 
-            const topicName = event.replace('.', sep);
+            const topicName = eventCmps[0];
             const sub = {
                 topicName: topicName,
                 subName: options.serviceName + sep + topicName
             };
+
             subs.push(sub);
         });
     }
