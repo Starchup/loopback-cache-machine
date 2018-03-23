@@ -188,7 +188,7 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
     return createTopic(pubsub, topicName, topicOptions).then(topic =>
     {
         const subscriptionName = subName ? subName + sep + process.env.NODE_ENV : makeUniqueSubName(cache.serviceName);
-        return topic.subscribe(subscriptionName, subscribeOptions).then(subscriptions =>
+        return topic.createSubscription(subscriptionName, subscribeOptions).then(subscriptions =>
         {
             //Google return format, always first index in array
             const subscription = subscriptions[0];
@@ -236,7 +236,7 @@ function getExistingModelsWatched(pubsub)
 //Saves data to cache, and checks if it's a registered event
 function defaultMessageHandler(topic, subscription, cache, message)
 {
-    let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
+    let data = JSON.parse(message.data.toString('utf8'));
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     handleEvent(cache, data);
@@ -245,7 +245,7 @@ function defaultMessageHandler(topic, subscription, cache, message)
 //Saves data to cache, does not check for events
 function createCache(cache, message)
 {
-    let data = getType(message.data) === 'String' ? JSON.parse(message.data) : data;
+    let data = JSON.parse(message.data.toString('utf8'));
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     if (cache.onReady) cache.onReady(null, cache.cached);
@@ -254,8 +254,10 @@ function createCache(cache, message)
 //On cache creation request, find the data, record which models to watch, and send
 function primeCache(cache, app, message)
 {
-    const models = message.data.models;
-    const responseSubName = message.data.responseSubName;
+    const data = JSON.parse(message.data.toString('utf8'));
+
+    const models = data.models;
+    const responseSubName = data.responseSubName;
     let dataToPublish = [];
 
     getCacheData(app, cache, models).then(res =>
@@ -276,7 +278,7 @@ function primeCache(cache, app, message)
         return createTopic(cache.pubsub, responseSubName);
     }).then(topic =>
     {
-        topic.publish(JSON.stringify(dataToPublish), publishCb);
+        topic.publisher().publish(new Buffer(JSON.stringify(dataToPublish)), publishCb);
     });
 }
 
@@ -524,12 +526,10 @@ function clientSide(cache, options)
     if (!options.projectId) throw new Error('Google Project Id is required for cache client');
     if (options.eventConfig && options.eventConfig.events && !options.eventConfig.eventFn) throw new Error('options.eventConfig.eventFn is required if including events');
 
-    let modelsToNotify = {};
-
-    cache.modelsToWatch = {};
     cache.modelsToWatch = cache.watchModels(options.modelsToWatch);
 
     //On boot, prime the cache by creating subs and a request message to the cache publisher
+    let modelsToNotify = {};
     let subs = [];
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
     {
@@ -591,11 +591,11 @@ function clientSide(cache, options)
         return createTopic(cache.pubsub, 'start-cache-client');
     }).then(topic =>
     {
-        topic.publish(
+        topic.publisher().publish(new Buffer(JSON.stringify(
         {
             responseSubName: responseSubName,
             models: modelsToNotify
-        }, publishCb);
+        })), publishCb);
     }).catch(e =>
     {
         if (cache.onReady) return cache.onReady(e);
@@ -638,7 +638,7 @@ function serverSide(cache, app, options)
         if (!topicName) throw new Error('Publishing message requires topic name');
         return createTopic(cache.pubsub, topicName).then(topic =>
         {
-            topic.publish(JSON.stringify(data), publishCb);
+            topic.publisher().publish(new Buffer(JSON.stringify(data)), publishCb);
         });
     }
 }
