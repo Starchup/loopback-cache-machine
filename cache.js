@@ -237,6 +237,8 @@ function getExistingModelsWatched(pubsub)
 function defaultMessageHandler(topic, subscription, cache, message)
 {
     let data = JSON.parse(message.data.toString('utf8'));
+
+    if (getType(data) === 'String') data = JSON.parse(data);
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     handleEvent(cache, data);
@@ -246,6 +248,8 @@ function defaultMessageHandler(topic, subscription, cache, message)
 function createCache(cache, message)
 {
     let data = JSON.parse(message.data.toString('utf8'));
+
+    if (getType(data) === 'String') data = JSON.parse(data);
     if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     if (cache.onReady) cache.onReady(null, cache.cached);
