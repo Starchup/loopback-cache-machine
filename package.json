@@ -1,6 +1,6 @@
 {
     "name": "loopback-cache-machine",
-    "version": "4.0.23",
+    "version": "4.0.24",
     "description": "Caching system for Loopback, maintained over webhook",
     "main": "cache.js",
     "scripts":

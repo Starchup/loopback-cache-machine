@@ -466,7 +466,7 @@ function getCacheData(app, cache, data)
 {
     var res = [];
 
-    return data.reduce(function (prev, modelName)
+    return Object.keys(data).reduce(function (prev, modelName)
     {
         return prev.then(function ()
         {
