@@ -259,17 +259,16 @@ function createCache(cache, message)
 //On cache creation request, find the data, record which models to watch, and send
 function primeCache(cache, app, message)
 {
-    const data = JSON.parse(message.data.toString('utf8'));
-
-    const models = data.models;
-    const responseSubName = data.responseSubName;
     let dataToPublish = [];
 
-    getCacheData(app, cache, models).then(res =>
+    const data = JSON.parse(message.data.toString('utf8'));
+    const responseSubName = data.responseSubName;
+
+    return getCacheData(app, cache, data.models).then(res =>
     {
         res.forEach(d =>
         {
-            const dataToAdd = d.data.map(datum =>
+            dataToPublish = dataToPublish.concat(d.data.map(datum =>
             {
                 return {
                     modelName: d.modelName,
@@ -277,8 +276,7 @@ function primeCache(cache, app, message)
                     modelId: datum.id,
                     data: datum
                 };
-            });
-            dataToPublish = dataToPublish.concat(dataToAdd);
+            }));
         });
         return createTopic(cache.pubsub, responseSubName);
     }).then(topic =>
@@ -466,38 +464,43 @@ function beforeDeleteHook(cache, app)
 //Query db for requested data
 function getCacheData(app, cache, data)
 {
-    const dbProms = [];
-    for (let modelName in data)
+    var res = [];
+
+    return data.reduce(function (prev, modelName)
     {
-        //Apply publishing hooks to relevant models
-        const Model = app.models[modelName];
-        if (cache.modelsWatched.indexOf(modelName) < 0) setModelsWatched(app, cache, [modelName]);
-
-        if (data[modelName].type && data[modelName].type !== 'cache') continue;
-
-        //Only prime the cache if the type is cache or left blank
-        const query = {};
-        if (data[modelName].fields && data[modelName].fields.length) query.fields = data[modelName].fields;
-        const prom = Model.find(query).then(modelData =>
+        return prev.then(function ()
         {
-            return {
-                modelName: modelName,
-                data: modelData
-            };
+            //Apply publishing hooks to relevant models
+            if (cache.modelsWatched.indexOf(modelName) < 0) setModelsWatched(app, cache, [modelName]);
+
+            //Only prime the cache if the type is cache or left blank (eg: `event`)
+            if (data[modelName].type && data[modelName].type !== 'cache') continue;
+
+            return app.models[modelName].find(
+            {
+                fields: data[modelName].fields || []
+            }).then(modelData =>
+            {
+                res.push(
+                {
+                    modelName: modelName,
+                    data: modelData
+                });
+            });
         });
-        dbProms.push(prom);
-    }
-    return Promise.all(dbProms);
+    }, Promise.resolve()).then(function ()
+    {
+        return res;
+    });
 }
 
 //Apply hook handlers to watched models
 function setModelsWatched(app, cache, models)
 {
-    if (!models || !models.length) return;
-    models.forEach(m =>
+    if (models) models.forEach(m =>
     {
         const Model = app.models[m];
-        if (!Model) return;
+        if (!m || !Model) return;
 
         cache.modelsWatched.push(m);
 
