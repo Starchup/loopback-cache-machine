@@ -105,14 +105,6 @@ function Cache(app, options)
     if (options && !options.serviceName) throw new Error('options.serviceName is required');
     self.serviceName = options.serviceName;
 
-    if (options && options.type === 'client') clientSide(self, options);
-    else if (options && options.type === 'server') serverSide(self, app, options);
-    else if (options && options.type === 'local') localSide(self, app, options);
-    else if (options && options.type)
-    {
-        throw new Error('Type "' + options.type + '"" is not valid. Valid options: client/server/local');
-    }
-
     if (options && options.filters)
     {
         if (getType(options.filters) !== 'Array') throw new Error('options.filters must be an array of functions');
@@ -125,6 +117,15 @@ function Cache(app, options)
         self.onReady = options.onReady;
     }
     self.type = options.type;
+
+    if (options && options.type === 'client') clientSide(self, options);
+    else if (options && options.type === 'server') serverSide(self, app, options);
+    else if (options && options.type === 'local') localSide(self, app, options);
+    else if (options && options.type)
+    {
+        throw new Error('Type "' + options.type + '"" is not valid. Valid options: client/server/local');
+    }
+
     return self;
 }
 
