@@ -142,13 +142,12 @@ function makeTopicName(topicName)
  * Creates a subscription name with the following format:
  * serviceName-environment-timestamp-randomNumber, truncated at 255 chars
  */
-function makeUniqueSubName(serviceName)
+function makeUniqueSubName(serviceName, topicName)
 {
     //Google name length limit
     const limit = 255;
     const timestamp = 't' + Date.now().toString();
-    const random = 'r' + Math.random().toString().replace('0.', '');
-    let subName = [serviceName, process.env.NODE_ENV, timestamp, random].join('-');
+    let subName = [serviceName, topicName, process.env.NODE_ENV, timestamp].join('-');
     if (subName.length > limit) subName = subName.substring(0, limit);
     return subName;
 }
@@ -180,16 +179,11 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
         autoCreate: true
     };
 
-    //Allows us to not have to worry about remembering to acknowledge each message
-    const subscribeOptions = {
-        autoAck: true
-    };
-
     //Find or create topic
     return createTopic(pubsub, topicName, topicOptions).then(topic =>
     {
-        const subscriptionName = subName ? subName + sep + process.env.NODE_ENV : makeUniqueSubName(cache.serviceName);
-        return topic.createSubscription(subscriptionName, subscribeOptions).then(subscriptions =>
+        const subscriptionName = subName ? subName + sep + process.env.NODE_ENV : makeUniqueSubName(cache.serviceName, topicName);
+        return topic.createSubscription(subscriptionName).then(subscriptions =>
         {
             //Google return format, always first index in array
             const subscription = subscriptions[0];
@@ -237,23 +231,23 @@ function getExistingModelsWatched(pubsub)
 //Saves data to cache, and checks if it's a registered event
 function defaultMessageHandler(topic, subscription, cache, message)
 {
-    let data = JSON.parse(message.data.toString('utf8'));
+    const data = JSON.parse(message.data.toString('utf8'));
 
-    if (getType(data) === 'String') data = JSON.parse(data);
-    if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     handleEvent(cache, data);
+
+    message.ack();
 }
 
 //Saves data to cache, does not check for events
 function createCache(cache, message)
 {
-    let data = JSON.parse(message.data.toString('utf8'));
+    const data = JSON.parse(message.data.toString('utf8'));
 
-    if (getType(data) === 'String') data = JSON.parse(data);
-    if (getType(data) !== 'Array') data = [data];
     receiveCacheData(cache, data);
     if (cache.onReady) cache.onReady(null, cache.cached);
+
+    message.ack();
 }
 
 //On cache creation request, find the data, record which models to watch, and send
@@ -264,7 +258,7 @@ function primeCache(cache, app, message)
     const data = JSON.parse(message.data.toString('utf8'));
     const responseSubName = data.responseSubName;
 
-    return getCacheData(app, cache, data.models).then(res =>
+    getCacheData(app, cache, data.models).then(res =>
     {
         res.forEach(d =>
         {
@@ -272,7 +266,7 @@ function primeCache(cache, app, message)
             {
                 return {
                     modelName: d.modelName,
-                    methodName: 'update',
+                    methodName: 'prime',
                     modelId: datum.id,
                     data: datum
                 };
@@ -281,8 +275,10 @@ function primeCache(cache, app, message)
         return createTopic(cache.pubsub, responseSubName);
     }).then(topic =>
     {
-        topic.publisher().publish(new Buffer(JSON.stringify(dataToPublish)), publishCb);
+        topic.publisher().publish(Buffer.from(JSON.stringify(dataToPublish)), publishCb);
     });
+
+    message.ack();
 }
 
 function defaultErrorHandler(topic, subscription, err)
@@ -296,53 +292,56 @@ function defaultErrorHandler(topic, subscription, err)
 //Check event list and send data to event handler/router
 function handleEvent(cache, data)
 {
-    if (!cache.eventList) return;
-    data.forEach(d =>
+    if (cache.eventList) data.forEach(d =>
     {
         const modelEvent = `${d.modelName}.${d.methodName}`;
-        if (cache.eventList[modelEvent])
+        if (!cache.eventList[modelEvent]) return;
+
+        cache.eventFn(d.modelName, d.methodName, d.modelId, d.data, (err, res) =>
         {
-            cache.eventFn(d.modelName, d.methodName, d.modelId, d.data, (err, res) =>
+            if (err)
             {
-                if (err)
-                {
-                    if (cache.eventFnErrorHandler) cache.eventFnErrorHandler(err);
-                    else console.error(err);
-                }
-            });
-        }
+                if (cache.eventFnErrorHandler) cache.eventFnErrorHandler(err);
+                else console.error(err);
+            }
+        });
     });
 }
 
 //Receive individual model update data
 function receiveCacheData(cache, data)
 {
-    let errorMsg;
     data.forEach(d =>
     {
         const modelId = d.data && d.data.id ? d.data.id : d.modelId;
 
+        let errorMsg;
         if (!d) errorMsg = 'message data is required';
+        else if (!d.modelId) errorMsg = 'model id is required';
         else if (!d.modelName) errorMsg = 'modelName is required';
         else if (!d.methodName) errorMsg = 'methodName is required';
-        else if (d.methodName === 'create' && !d.data) errorMsg = 'data is required for create';
-        else if (d.methodName === 'update' && !d.data) errorMsg = 'data is required for update';
-        else if (d.methodName === 'create' && !modelId) errorMsg = 'model id is required for create';
-        else if (d.methodName === 'update' && !modelId) errorMsg = 'model id is required for update';
-        else if (d.methodName === 'delete' && !modelId) errorMsg = 'model id is required for deletion';
+        else if (d.methodName !== 'delete' && !d.data) errorMsg = 'data is required';
 
         if (errorMsg) return console.error(`${errorMsg} ${JSON.stringify(d)}`);
-        else
-        {
-            const localData = cache.cached[d.modelName];
-            // If there is not even an empty dictionary for this modelName
-            // if means this cache is not listening for the model, so only
-            // add the data if we actually care about it
-            if (!localData) return;
-            if (d.data) localData[modelId] = d.data;
 
-            // If there is no data, it means it's a deletion
-            else if (d.modelId && d.methodName === 'delete') delete localData[d.modelId];
+        const localData = cache.cached[d.modelName];
+        if (!localData) return;
+
+        if (d.methodName === 'update')
+        {
+            localData[modelId] = d.data;
+        }
+        else if (d.methodName === 'prime')
+        {
+            if (!localData[modelId] || !localData[modelId].id) localData[modelId] = d.data;
+        }
+        else if (d.methodName === 'create')
+        {
+            if (!localData[modelId] || !localData[modelId].id) localData[modelId] = d.data;
+        }
+        else if (d.methodName === 'delete')
+        {
+            if (d.modelId) delete localData[d.modelId];
         }
     });
 }
@@ -391,29 +390,31 @@ function afterSaveHook(cache)
 
         Promise.resolve().then(() =>
         {
-            if (typeof modelId !== 'number')
-            {
-                if (modelId.inq && Array.isArray(modelId.inq))
-                {
-                    modelId.inq.forEach(id =>
-                    {
-                        if (typeof id === 'number') return cache.emit(
-                        {
-                            modelName: modelName,
-                            methodName: method,
-                            modelId: id,
-                            data: instance
-                        }, topicName);
-                    });
-                }
-            }
-            else return cache.emit(
+            if (typeof modelId === 'number') return cache.emit([
             {
                 modelName: modelName,
                 methodName: method,
                 modelId: modelId,
                 data: instance
-            }, topicName);
+            }], topicName);
+
+            if (modelId.inq && Array.isArray(modelId.inq))
+            {
+                const data = modelId.inq.filter(id =>
+                {
+                    return typeof id === 'number';
+                }).map(id =>
+                {
+                    return {
+                        modelName: modelName,
+                        methodName: method,
+                        modelId: id,
+                        data: instance
+                    };
+                });
+                return cache.emit(data, topicName);
+            }
+
         }).then(() =>
         {
             next();
@@ -433,27 +434,26 @@ function beforeDeleteHook(cache, app)
         const methodName = 'delete';
         const topicName = modelName;
 
-
         Model.find(
         {
             where: ctx.where
         }).then(models =>
         {
             if (!models || models.length < 1) return;
-            return JSON.parse(JSON.stringify(models)).reduce((prev, curr, idx) =>
-            {
-                return prev.then(() =>
-                {
-                    if (!shouldPublish(cache, modelName, methodName, curr, ctx)) return Promise.resolve();
 
-                    return cache.emit(
-                    {
-                        modelName: modelName,
-                        methodName: methodName,
-                        modelId: curr.id
-                    }, topicName).catch(console.error);
-                });
-            }, Promise.resolve());
+            const data = JSON.parse(JSON.stringify(models)).filter(m =>
+            {
+                return shouldPublish(cache, modelName, methodName, m, ctx);
+            }).map(m =>
+            {
+                return {
+                    modelName: modelName,
+                    methodName: methodName,
+                    modelId: m.id
+                }
+            });
+
+            return cache.emit(data, topicName);
         }).catch(console.error).then(next);
     }
 }
@@ -466,9 +466,9 @@ function getCacheData(app, cache, data)
 {
     var res = [];
 
-    return Object.keys(data).reduce(function (prev, modelName)
+    return Object.keys(data).reduce((prev, modelName) =>
     {
-        return prev.then(function ()
+        return prev.then(() =>
         {
             //Apply publishing hooks to relevant models
             if (cache.modelsWatched.indexOf(modelName) < 0) setModelsWatched(app, cache, [modelName]);
@@ -488,7 +488,7 @@ function getCacheData(app, cache, data)
                 });
             });
         });
-    }, Promise.resolve()).then(function ()
+    }, Promise.resolve()).then(() =>
     {
         return res;
     });
@@ -531,20 +531,35 @@ function getType(val)
  */
 function clientSide(cache, options)
 {
-    if (!options.projectId) throw new Error('Google Project Id is required for cache client');
-    if (options.eventConfig && options.eventConfig.events && !options.eventConfig.eventFn) throw new Error('options.eventConfig.eventFn is required if including events');
+    if (!options.projectId)
+    {
+        throw new Error('Google Project Id is required for cache client');
+    }
+    if (options.eventConfig && options.eventConfig.events && !options.eventConfig.eventFn)
+    {
+        throw new Error('options.eventConfig.eventFn is required if including events');
+    }
 
     cache.modelsToWatch = cache.watchModels(options.modelsToWatch);
 
     //On boot, prime the cache by creating subs and a request message to the cache publisher
     let modelsToNotify = {};
     let subs = [];
+
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
     {
-        modelsToNotify = JSON.parse(JSON.stringify(cache.modelsToWatch));
-
         //Add cache models to sub list
-        subs = Object.keys(cache.modelsToWatch);
+        Object.keys(cache.modelsToWatch).forEach(modelName =>
+        {
+            modelsToNotify[modelName] = {
+                modelName: modelName,
+                type: 'cache'
+            };
+            subs.push(
+            {
+                topicName: modelName
+            });
+        });
     }
 
     //Set up event related behavior
@@ -560,12 +575,14 @@ function clientSide(cache, options)
 
             //Add to list of models to notify server side of
             const eventCmps = event.split('.');
+            const topicName = eventCmps[0];
+            const methodName = eventCmps[1];
+
             modelsToNotify[eventCmps[0]] = {
-                modelName: eventCmps[0],
+                modelName: topicName,
                 type: 'event'
             };
 
-            const topicName = eventCmps[0];
             const sub = {
                 topicName: topicName,
                 subName: options.serviceName + sep + topicName
@@ -575,19 +592,17 @@ function clientSide(cache, options)
         });
     }
 
-    const subPromises = subs.map(s =>
-    {
-        registerSubscription(cache, cache.pubsub, s.topicName, s.subName);
-    });
-
-    let responseSubName;
+    const responseSubName = makeUniqueSubName(cache.serviceName, 'create-cache');
 
     //Register model-based subscriptions (cache-update and event)
-    return Promise.all(subPromises).then(() =>
+    return subs.reduce((prev, s) =>
     {
-        //Tell the publisher what topic to subscribe to so only this service gets the result
-        responseSubName = ['create-cache', cache.serviceName].join(sep);
-
+        return prev.then(() =>
+        {
+            return registerSubscription(cache, cache.pubsub, s.topicName, s.subName);
+        });
+    }, Promise.resolve()).then(() =>
+    {
         //Bind cache as first param
         const cacheHandler = createCache.bind(null, cache);
 
@@ -599,7 +614,7 @@ function clientSide(cache, options)
         return createTopic(cache.pubsub, 'start-cache-client');
     }).then(topic =>
     {
-        topic.publisher().publish(new Buffer(JSON.stringify(
+        topic.publisher().publish(Buffer.from(JSON.stringify(
         {
             responseSubName: responseSubName,
             models: modelsToNotify
@@ -630,7 +645,7 @@ function serverSide(cache, app, options)
         const msgHandler = primeCache.bind(null, cache, app);
 
         //Listen for cache creation requests, find data and publish back
-        registerSubscription(cache, cache.pubsub, 'start-cache-client', null, msgHandler).then(() =>
+        registerSubscription(cache, cache.pubsub, 'start-cache-client', null, msgHandler).then((res) =>
         {
             if (cache.onReady) cache.onReady(null, true);
         });
@@ -646,7 +661,7 @@ function serverSide(cache, app, options)
         if (!topicName) throw new Error('Publishing message requires topic name');
         return createTopic(cache.pubsub, topicName).then(topic =>
         {
-            topic.publisher().publish(new Buffer(JSON.stringify(data)), publishCb);
+            return topic.publisher().publish(Buffer.from(JSON.stringify(data)), publishCb);
         });
     }
 }
