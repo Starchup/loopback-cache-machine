@@ -474,7 +474,7 @@ function getCacheData(app, cache, data)
             if (cache.modelsWatched.indexOf(modelName) < 0) setModelsWatched(app, cache, [modelName]);
 
             //Only prime the cache if the type is cache or left blank (eg: `event`)
-            if (data[modelName].type && data[modelName].type !== 'cache') continue;
+            if (data[modelName].type && data[modelName].type !== 'cache') return;
 
             return app.models[modelName].find(
             {
@@ -680,7 +680,7 @@ function localSide(cache, app, options)
     //On boot, prime the cache
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
     {
-        getCacheData(app, cache, cache.modelsToWatch).then(res =>
+        return getCacheData(app, cache, cache.modelsToWatch).then(res =>
         {
             res.forEach(d =>
             {
