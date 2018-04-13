@@ -292,7 +292,7 @@ function defaultErrorHandler(topic, subscription, err)
 //Check event list and send data to event handler/router
 function handleEvent(cache, data)
 {
-    if (cache.eventList) data.forEach(d =>
+    if (cache.eventList && data) data.forEach(d =>
     {
         const modelEvent = `${d.modelName}.${d.methodName}`;
         if (!cache.eventList[modelEvent]) return;
@@ -311,7 +311,7 @@ function handleEvent(cache, data)
 //Receive individual model update data
 function receiveCacheData(cache, data)
 {
-    data.forEach(d =>
+    if (data) data.forEach(d =>
     {
         const modelId = d.data && d.data.id ? d.data.id : d.modelId;
 
