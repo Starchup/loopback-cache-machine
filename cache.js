@@ -292,7 +292,7 @@ function defaultErrorHandler(topic, subscription, err)
 //Check event list and send data to event handler/router
 function handleEvent(cache, data)
 {
-    if (cache.eventList && data) data.forEach(d =>
+    if (cache.eventList) data.forEach(d =>
     {
         const modelEvent = `${d.modelName}.${d.methodName}`;
         if (!cache.eventList[modelEvent]) return;
@@ -311,7 +311,7 @@ function handleEvent(cache, data)
 //Receive individual model update data
 function receiveCacheData(cache, data)
 {
-    if (data) data.forEach(d =>
+    data.forEach(d =>
     {
         const modelId = d.data && d.data.id ? d.data.id : d.modelId;
 
@@ -676,17 +676,39 @@ function localSide(cache, app, options)
     //Cache-type specific emitter/publisher
     cache.emit = function (data)
     {
-        const localData = cache.cached[data.modelName];
-        const modelId = data.data && data.data.id ? data.data.id : data.modelId;
+        data.forEach(d =>
+        {
+            const modelId = d.data && d.data.id ? d.data.id : d.modelId;
 
-        // If there is not even an empty dictionary for this modelName
-        // if means this cache is not listening for the model, so only
-        // add the data if we actually care about it
-        if (data.data && localData) localData[modelId] = data.data;
+            let errorMsg;
+            if (!d) errorMsg = 'message data is required';
+            else if (!d.modelId) errorMsg = 'model id is required';
+            else if (!d.modelName) errorMsg = 'modelName is required';
+            else if (!d.methodName) errorMsg = 'methodName is required';
+            else if (d.methodName !== 'delete' && !d.data) errorMsg = 'data is required';
 
-        // If there is no data, it means it's a deletion
-        else if (data.modelId && data.methodName === 'delete') delete localData[data.modelId];
-        return Promise.resolve();
+            if (errorMsg) return console.error(`${errorMsg} ${JSON.stringify(d)}`);
+
+            const localData = cache.cached[d.modelName];
+            if (!localData) return;
+
+            if (d.methodName === 'update')
+            {
+                localData[modelId] = d.data;
+            }
+            else if (d.methodName === 'prime')
+            {
+                if (!localData[modelId] || !localData[modelId].id) localData[modelId] = d.data;
+            }
+            else if (d.methodName === 'create')
+            {
+                if (!localData[modelId] || !localData[modelId].id) localData[modelId] = d.data;
+            }
+            else if (d.methodName === 'delete')
+            {
+                if (d.modelId) delete localData[d.modelId];
+            }
+        });
     }
 
     cache.modelsWatched = [];
