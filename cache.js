@@ -155,7 +155,7 @@ function makeUniqueSubName(serviceName, topicName)
     //Google name length limit
     const limit = 255;
     const timestamp = 't' + Date.now().toString();
-    let subName = [serviceName, topicName, process.env.NODE_ENV, timestamp].join('-');
+    let subName = [process.env.NODE_ENV, serviceName, topicName, timestamp].join('-');
     if (subName.length > limit) subName = subName.substring(0, limit);
     return subName;
 }
