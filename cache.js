@@ -1,6 +1,14 @@
 "use strict";
 
 const PubSub = require('@google-cloud/pubsub');
+
+const PRIME_METHOD = 'prime';
+const PRIME_CACHE = 'create-cache';
+const ASK_PRIME_CACHE = 'start-cache-client';
+const MODEL_TOPIC = 'models';
+const TYPE_CACHE = 'cache';
+const TYPE_EVENT = 'event';
+
 const cacheList = {};
 
 module.exports = function (app, options)
@@ -172,7 +180,7 @@ function createTopic(pubsub, topicName, topicOptions)
 }
 
 //Finds/creates a topic and registers a subscriber to that topic
-function registerSubscription(cache, pubsub, topicName, subName, onMessage, onError)
+function registerSubscription(cache, topicName, onMessage, onError)
 {
     //Find-or-create
     const topicOptions = {
@@ -180,9 +188,9 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
     };
 
     //Find or create topic
-    return createTopic(pubsub, topicName, topicOptions).then(topic =>
+    return createTopic(cache.pubsub, topicName, topicOptions).then(topic =>
     {
-        const subscriptionName = subName ? subName + sep + process.env.NODE_ENV : makeUniqueSubName(cache.serviceName, topicName);
+        const subscriptionName = makeUniqueSubName(cache.serviceName, topicName);
         return topic.createSubscription(subscriptionName).then(subscriptions =>
         {
             //Google return format, always first index in array
@@ -195,33 +203,9 @@ function registerSubscription(cache, pubsub, topicName, subName, onMessage, onEr
             //Handlers will receive message object as param
             subscription.on('message', messageHandler);
             subscription.on('error', errorHandler);
+
+            return subscriptionName;
         }).catch(console.error);
-    });
-}
-
-//Parses existing pubsub topics for models to always watch
-function getExistingModelsWatched(pubsub)
-{
-    const topicNameRegex = /.*topics\/([a-zA-Z\-]*).*/;
-    return pubsub.getTopics().then(topics =>
-    {
-        if (!topics || !topics.length) topics = [];
-        //Google response format
-        topics = topics[0];
-        const usedTopics = {};
-
-        //Unique list of model names from subscriptions
-        return topics.reduce((list, t) =>
-        {
-            if (!t.name || t.name.indexOf(process.env.NODE_ENV) < 0) return list;
-            const name = t.name.replace(topicNameRegex, '$1');
-
-            if (usedTopics.hasOwnProperty(name)) return list;
-
-            usedTopics[name] = true;
-            list.push(name);
-            return list;
-        }, []);
     });
 }
 
@@ -240,7 +224,7 @@ function defaultMessageHandler(topic, subscription, cache, message)
 }
 
 //Saves data to cache, does not check for events
-function createCache(cache, message)
+function primeCache(cache, message)
 {
     const data = JSON.parse(message.data.toString('utf8'));
 
@@ -251,12 +235,11 @@ function createCache(cache, message)
 }
 
 //On cache creation request, find the data, record which models to watch, and send
-function primeCache(cache, app, message)
+function askPrimeCache(cache, app, message)
 {
     let dataToPublish = [];
 
     const data = JSON.parse(message.data.toString('utf8'));
-    const responseSubName = data.responseSubName;
 
     getCacheData(app, cache, data.models).then(res =>
     {
@@ -266,13 +249,13 @@ function primeCache(cache, app, message)
             {
                 return {
                     modelName: d.modelName,
-                    methodName: 'prime',
+                    methodName: PRIME_METHOD,
                     modelId: datum.id,
                     data: datum
                 };
             }));
         });
-        return createTopic(cache.pubsub, responseSubName);
+        return createTopic(cache.pubsub, PRIME_CACHE);
     }).then(topic =>
     {
         topic.publisher().publish(Buffer.from(JSON.stringify(dataToPublish)), publishCb);
@@ -331,7 +314,7 @@ function receiveCacheData(cache, data)
         {
             localData[modelId] = d.data;
         }
-        else if (d.methodName === 'prime')
+        else if (d.methodName === PRIME_METHOD)
         {
             if (!localData[modelId] || !localData[modelId].id) localData[modelId] = d.data;
         }
@@ -396,7 +379,7 @@ function afterSaveHook(cache)
                 methodName: method,
                 modelId: modelId,
                 data: instance
-            }], topicName);
+            }], MODEL_TOPIC);
 
             if (modelId.inq && Array.isArray(modelId.inq))
             {
@@ -412,7 +395,7 @@ function afterSaveHook(cache)
                         data: instance
                     };
                 });
-                return cache.emit(data, topicName);
+                return cache.emit(data, MODEL_TOPIC);
             }
 
         }).then(() =>
@@ -453,7 +436,7 @@ function beforeDeleteHook(cache, app)
                 }
             });
 
-            return cache.emit(data, topicName);
+            return cache.emit(data, MODEL_TOPIC);
         }).catch(console.error).then(next);
     }
 }
@@ -474,7 +457,7 @@ function getCacheData(app, cache, data)
             if (cache.modelsWatched.indexOf(modelName) < 0) setModelsWatched(app, cache, [modelName]);
 
             //Only prime the cache if the type is cache or left blank (eg: `event`)
-            if (data[modelName].type && data[modelName].type !== 'cache') return;
+            if (data[modelName].type && data[modelName].type !== TYPE_CACHE) return;
 
             return app.models[modelName].find(
             {
@@ -553,12 +536,8 @@ function clientSide(cache, options)
         {
             modelsToNotify[modelName] = {
                 modelName: modelName,
-                type: 'cache'
+                type: TYPE_CACHE
             };
-            subs.push(
-            {
-                topicName: modelName
-            });
         });
     }
 
@@ -575,48 +554,29 @@ function clientSide(cache, options)
 
             //Add to list of models to notify server side of
             const eventCmps = event.split('.');
-            const topicName = eventCmps[0];
-            const methodName = eventCmps[1];
-
             modelsToNotify[eventCmps[0]] = {
-                modelName: topicName,
-                type: 'event'
+                modelName: eventCmps[0],
+                type: TYPE_EVENT
             };
-
-            const sub = {
-                topicName: topicName,
-                subName: options.serviceName + sep + topicName
-            };
-
-            subs.push(sub);
         });
     }
 
-    const responseSubName = makeUniqueSubName(cache.serviceName, 'create-cache');
-
     //Register model-based subscriptions (cache-update and event)
-    return subs.reduce((prev, s) =>
-    {
-        return prev.then(() =>
-        {
-            return registerSubscription(cache, cache.pubsub, s.topicName, s.subName);
-        });
-    }, Promise.resolve()).then(() =>
+    return registerSubscription(cache, MODEL_TOPIC).then(() =>
     {
         //Bind cache as first param
-        const cacheHandler = createCache.bind(null, cache);
+        const cacheHandler = primeCache.bind(null, cache);
 
         //Register a special subscription for cache creation
-        return registerSubscription(cache, cache.pubsub, responseSubName, null, cacheHandler);
+        return registerSubscription(cache, PRIME_CACHE, cacheHandler);
     }).then(() =>
     {
         //Notify publishers of client start
-        return createTopic(cache.pubsub, 'start-cache-client');
+        return createTopic(cache.pubsub, ASK_PRIME_CACHE);
     }).then(topic =>
     {
         topic.publisher().publish(Buffer.from(JSON.stringify(
         {
-            responseSubName: responseSubName,
             models: modelsToNotify
         })), publishCb);
     }).catch(e =>
@@ -636,19 +596,13 @@ function serverSide(cache, app, options)
 
     cache.modelsWatched = [];
 
-    //Find models to watch based on existing pub/sub topics
-    getExistingModelsWatched(cache.pubsub).then(models =>
+    //Bind cache and app as params
+    const msgHandler = askPrimeCache.bind(null, cache, app);
+
+    //Listen for cache creation requests, find data and publish back
+    registerSubscription(cache, ASK_PRIME_CACHE, msgHandler).then((res) =>
     {
-        setModelsWatched(app, cache, models);
-
-        //Bind cache and app as params
-        const msgHandler = primeCache.bind(null, cache, app);
-
-        //Listen for cache creation requests, find data and publish back
-        registerSubscription(cache, cache.pubsub, 'start-cache-client', null, msgHandler).then((res) =>
-        {
-            if (cache.onReady) cache.onReady(null, true);
-        });
+        if (cache.onReady) cache.onReady(null, true);
     }).catch(e =>
     {
         if (cache.onReady) return cache.onReady(e);
@@ -696,7 +650,7 @@ function localSide(cache, app, options)
             {
                 localData[modelId] = d.data;
             }
-            else if (d.methodName === 'prime')
+            else if (d.methodName === PRIME_METHOD)
             {
                 if (!localData[modelId] || !localData[modelId].id) localData[modelId] = d.data;
             }
