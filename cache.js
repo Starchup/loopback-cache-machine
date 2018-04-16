@@ -148,17 +148,13 @@ function makeTopicName(topicName)
 
 function makeSubName(topicName, serviceName)
 {
-    let subName = [process.env.NODE_ENV, serviceName, topicName].join('-');
+    return [process.env.NODE_ENV, serviceName, topicName].join('-');
 }
 
 function makeUniqueSubName(topicName, serviceName)
 {
-    //Google name length limit
-    const limit = 255;
     const timestamp = 't' + Date.now().toString();
-    let subName = [process.env.NODE_ENV, serviceName, topicName, timestamp].join('-');
-    if (subName.length > limit) subName = subName.substring(0, limit);
-    return subName;
+    return [process.env.NODE_ENV, serviceName, topicName, timestamp].join('-');
 }
 
 function createTopic(pubsub, topicName, topicOptions)
