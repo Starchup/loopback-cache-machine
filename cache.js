@@ -146,11 +146,12 @@ function makeTopicName(topicName)
     return topicName + sep + process.env.NODE_ENV;
 }
 
-/*
- * Creates a subscription name with the following format:
- * serviceName-environment-timestamp-randomNumber, truncated at 255 chars
- */
-function makeUniqueSubName(serviceName, topicName)
+function makeSubName(topicName, serviceName)
+{
+    let subName = [process.env.NODE_ENV, serviceName, topicName].join('-');
+}
+
+function makeUniqueSubName(topicName, serviceName)
 {
     //Google name length limit
     const limit = 255;
@@ -180,17 +181,16 @@ function createTopic(pubsub, topicName, topicOptions)
 }
 
 //Finds/creates a topic and registers a subscriber to that topic
-function registerSubscription(cache, topicName, onMessage, onError)
+function registerSubscription(cache, topicName, unique, onMessage, onError)
 {
-    //Find-or-create
-    const topicOptions = {
-        autoCreate: true
-    };
-
     //Find or create topic
-    return createTopic(cache.pubsub, topicName, topicOptions).then(topic =>
+    return createTopic(cache.pubsub, topicName,
     {
-        const subscriptionName = makeUniqueSubName(cache.serviceName, topicName);
+        autoCreate: true
+    }).then(topic =>
+    {
+        const svcName = cache.serviceName;
+        const subscriptionName = unique ? makeUniqueSubName(topicName, svcName) : makeSubName(topicName, svcName);
         return topic.createSubscription(subscriptionName).then(subscriptions =>
         {
             //Google return format, always first index in array
@@ -198,15 +198,15 @@ function registerSubscription(cache, topicName, onMessage, onError)
 
             //Bind default event handlers with helpful contextual params
             const messageHandler = onMessage || defaultMessageHandler.bind(null, topic, subscription, cache);
-            const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription);
+            const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription, cache);
 
             //Handlers will receive message object as param
             subscription.on('message', messageHandler);
             subscription.on('error', errorHandler);
 
             return subscriptionName;
-        }).catch(console.error);
-    });
+        });
+    }).catch(console.error);
 }
 
 
@@ -216,22 +216,29 @@ function registerSubscription(cache, topicName, onMessage, onError)
 function defaultMessageHandler(topic, subscription, cache, message)
 {
     const data = JSON.parse(message.data.toString('utf8'));
-
     receiveCacheData(cache, data);
-    handleEvent(cache, data);
-
     message.ack();
 }
 
-//Saves data to cache, does not check for events
-function primeCache(cache, message)
+function defaultErrorHandler(topic, subscription, cache, err)
+{
+    console.error('Error for topic ' + topic.name + ' and subscription ' + subscription.name + ': ' + err.message);
+}
+
+function eventMessageHandler(topic, subscription, cache, message)
 {
     const data = JSON.parse(message.data.toString('utf8'));
-
-    receiveCacheData(cache, data);
-    if (cache.onReady) cache.onReady(null, cache.cached);
-
+    handleEvent(cache, data);
     message.ack();
+}
+
+function primeMessageHandler(cache, message)
+{
+    const data = JSON.parse(message.data.toString('utf8'));
+    receiveCacheData(cache, data);
+    message.ack();
+
+    if (cache.onReady) cache.onReady(null, cache.cached);
 }
 
 //On cache creation request, find the data, record which models to watch, and send
@@ -262,12 +269,6 @@ function askPrimeCache(cache, app, message)
     });
 
     message.ack();
-}
-
-function defaultErrorHandler(topic, subscription, err)
-{
-    console.error('Error for topic ' + topic.name + ' and subscription ' + subscription.name);
-    console.error(err);
 }
 
 /* Pubsub Handler helpers */
@@ -527,8 +528,6 @@ function clientSide(cache, options)
 
     //On boot, prime the cache by creating subs and a request message to the cache publisher
     let modelsToNotify = {};
-    let subs = [];
-
     if (cache.modelsToWatch && Object.keys(cache.modelsToWatch).length)
     {
         //Add cache models to sub list
@@ -554,21 +553,30 @@ function clientSide(cache, options)
 
             //Add to list of models to notify server side of
             const eventCmps = event.split('.');
-            modelsToNotify[eventCmps[0]] = {
-                modelName: eventCmps[0],
+            const topicName = eventCmps[0];
+
+            modelsToNotify[topicName] = {
+                modelName: topicName,
                 type: TYPE_EVENT
             };
         });
     }
 
-    //Register model-based subscriptions (cache-update and event)
-    return registerSubscription(cache, MODEL_TOPIC).then(() =>
-    {
-        //Bind cache as first param
-        const cacheHandler = primeCache.bind(null, cache);
+    const primeHandler = primeMessageHandler.bind(null, cache);
+    const eventHandler = eventMessageHandler.bind(null, cache);
 
+    //Register model cache subscription - unique susbcription for per service
+    return registerSubscription(cache, MODEL_TOPIC, true).then(() =>
+    {
+        //Register event subscriptions - non-unique subscription per service
+        if (cache.eventList)
+        {
+            return registerSubscription(cache, MODEL_TOPIC, false, eventHandler);
+        }
+    }).then(() =>
+    {
         //Register a special subscription for cache creation
-        return registerSubscription(cache, PRIME_CACHE, cacheHandler);
+        return registerSubscription(cache, PRIME_CACHE, true, primeHandler);
     }).then(() =>
     {
         //Notify publishers of client start
@@ -600,7 +608,7 @@ function serverSide(cache, app, options)
     const msgHandler = askPrimeCache.bind(null, cache, app);
 
     //Listen for cache creation requests, find data and publish back
-    registerSubscription(cache, ASK_PRIME_CACHE, msgHandler).then((res) =>
+    registerSubscription(cache, ASK_PRIME_CACHE, true, msgHandler).then((res) =>
     {
         if (cache.onReady) cache.onReady(null, true);
     }).catch(e =>
