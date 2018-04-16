@@ -193,8 +193,8 @@ function registerSubscription(cache, topicName, unique, onMessage, onError)
             const subscription = subscriptions[0];
 
             //Bind default event handlers with helpful contextual params
-            const messageHandler = onMessage || defaultMessageHandler.bind(null, topic, subscription, cache);
-            const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription, cache);
+            const messageHandler = onMessage || defaultMessageHandler.bind(null, cache);
+            const errorHandler = onError || defaultErrorHandler.bind(null, topic, subscription);
 
             //Handlers will receive message object as param
             subscription.on('message', messageHandler);
@@ -209,19 +209,14 @@ function registerSubscription(cache, topicName, unique, onMessage, onError)
 /* Pubsub Handlers */
 
 //Saves data to cache, and checks if it's a registered event
-function defaultMessageHandler(topic, subscription, cache, message)
+function defaultMessageHandler(cache, message)
 {
     const data = JSON.parse(message.data.toString('utf8'));
     receiveCacheData(cache, data);
     message.ack();
 }
 
-function defaultErrorHandler(topic, subscription, cache, err)
-{
-    console.error('Error for topic ' + topic.name + ' and subscription ' + subscription.name + ': ' + err.message);
-}
-
-function eventMessageHandler(topic, subscription, cache, message)
+function eventMessageHandler(cache, message)
 {
     const data = JSON.parse(message.data.toString('utf8'));
     handleEvent(cache, data);
@@ -235,6 +230,11 @@ function primeMessageHandler(cache, message)
     message.ack();
 
     if (cache.onReady) cache.onReady(null, cache.cached);
+}
+
+function defaultErrorHandler(topic, subscription, err)
+{
+    console.error('Error for topic ' + topic.name + ' and subscription ' + subscription.name + ': ' + err.message);
 }
 
 //On cache creation request, find the data, record which models to watch, and send
