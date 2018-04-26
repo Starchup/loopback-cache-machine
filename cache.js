@@ -429,7 +429,8 @@ function beforeDeleteHook(cache, app)
                 return {
                     modelName: modelName,
                     methodName: methodName,
-                    modelId: m.id
+                    modelId: m.id,
+                    data: m
                 }
             });
 
