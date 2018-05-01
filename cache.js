@@ -211,23 +211,26 @@ function registerSubscription(cache, topicName, unique, onMessage, onError)
 //Saves data to cache, and checks if it's a registered event
 function defaultMessageHandler(cache, message)
 {
+    message.ack();
+
     const data = JSON.parse(message.data.toString('utf8'));
     receiveCacheData(cache, data);
-    message.ack();
 }
 
 function eventMessageHandler(cache, message)
 {
+    message.ack();
+
     const data = JSON.parse(message.data.toString('utf8'));
     handleEvent(cache, data);
-    message.ack();
 }
 
 function primeMessageHandler(cache, message)
 {
+    message.ack();
+
     const data = JSON.parse(message.data.toString('utf8'));
     receiveCacheData(cache, data);
-    message.ack();
 
     if (cache.onReady) cache.onReady(null, cache.cached);
 }
