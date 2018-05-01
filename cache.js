@@ -187,6 +187,7 @@ function registerSubscription(cache, topicName, unique, onMessage, onError)
     {
         const svcName = cache.serviceName;
         const subscriptionName = unique ? makeUniqueSubName(topicName, svcName) : makeSubName(topicName, svcName);
+        console.info(cache.serviceName + ' createSubscription ' + subscriptionName);
         return topic.createSubscription(subscriptionName).then(subscriptions =>
         {
             //Google return format, always first index in array
@@ -214,6 +215,7 @@ function defaultMessageHandler(cache, message)
     message.ack();
 
     const data = JSON.parse(message.data.toString('utf8'));
+    console.info(cache.serviceName + ' defaultMessageHandler ' + JSON.stringify(data));
     receiveCacheData(cache, data);
 }
 
@@ -222,6 +224,7 @@ function eventMessageHandler(cache, message)
     message.ack();
 
     const data = JSON.parse(message.data.toString('utf8'));
+    console.info(cache.serviceName + ' eventMessageHandler ' + JSON.stringify(data));
     handleEvent(cache, data);
 }
 
@@ -230,6 +233,7 @@ function primeMessageHandler(cache, message)
     message.ack();
 
     const data = JSON.parse(message.data.toString('utf8'));
+    console.info(cache.serviceName + ' primeMessageHandler ' + JSON.stringify(data));
     receiveCacheData(cache, data);
 
     if (cache.onReady) cache.onReady(null, cache.cached);
@@ -264,6 +268,7 @@ function askPrimeCache(cache, app, message)
         return createTopic(cache.pubsub, PRIME_CACHE);
     }).then(topic =>
     {
+        console.info(cache.serviceName + ' askPrimeCache ' + JSON.stringify(dataToPublish));
         topic.publisher().publish(Buffer.from(JSON.stringify(dataToPublish)), publishCb);
     });
 
@@ -623,6 +628,7 @@ function serverSide(cache, app, options)
         if (!topicName) throw new Error('Publishing message requires topic name');
         return createTopic(cache.pubsub, topicName).then(topic =>
         {
+            console.info(cache.serviceName + ' emit ' + JSON.stringify(data));
             return topic.publisher().publish(Buffer.from(JSON.stringify(data)), publishCb);
         });
     }
